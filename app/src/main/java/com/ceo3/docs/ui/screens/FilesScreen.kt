@@ -15,35 +15,35 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
 
 data class FileItem(val id: String, val name: String, val isFolder: Boolean, val itemCount: Int = 0)
 
-class FilesViewModel : ViewModel() {
+class FilesViewModel(application: android.app.Application) : AndroidViewModel(application) {
+    private val dao = com.ceo3.docs.data.local.DocDatabase.getDatabase(application).documentDao()
     private val _uiState = MutableStateFlow(FilesUiState())
     val uiState: StateFlow<FilesUiState> = _uiState
 
     init {
-        loadFiles()
-    }
-
-    private fun loadFiles() {
-        _uiState.value = FilesUiState(
-            tags = listOf("School", "Work", "Finance", "Personal"),
-            items = listOf(
-                FileItem("f1", "School", true, 12),
-                FileItem("f2", "Work", true, 5),
-                FileItem("f3", "Finance", true, 2),
-                FileItem("d1", "Resume.pdf", false)
-            )
-        )
+        viewModelScope.launch {
+            dao.getAllDocuments().collect { docs ->
+                val allTags = docs.flatMap { it.tags.split(",") }.map { it.trim() }.filter { it.isNotEmpty() }.distinct()
+                val items = docs.map { doc -> FileItem(doc.id, doc.title, false, 0) }
+                _uiState.value = _uiState.value.copy(
+                    tags = allTags.ifEmpty { listOf("School", "Work", "Finance", "Personal") },
+                    items = items
+                )
+            }
+        }
     }
 
     fun selectTag(tag: String) {
         _uiState.value = _uiState.value.copy(selectedTag = tag)
+        // In a real app, we would re-filter the list here based on the selected tag
     }
 }
 
@@ -57,7 +57,7 @@ data class FilesUiState(
 @Composable
 fun FilesScreen(
     onDocumentClick: (String) -> Unit,
-    viewModel: FilesViewModel = viewModel()
+    viewModel: FilesViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
 
