@@ -17,6 +17,9 @@ interface DocumentDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertDocument(document: DocumentEntity)
 
+    @Query("SELECT * FROM documents WHERE id = :id LIMIT 1")
+    suspend fun getDocumentById(id: String): DocumentEntity?
+
     @Query("DELETE FROM documents WHERE id = :id")
     suspend fun deleteDocument(id: String)
 }

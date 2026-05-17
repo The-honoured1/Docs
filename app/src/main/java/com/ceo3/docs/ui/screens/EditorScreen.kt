@@ -23,16 +23,31 @@ class EditorViewModel(application: android.app.Application) : AndroidViewModel(a
     private val _uiState = MutableStateFlow(EditorUiState())
     val uiState: StateFlow<EditorUiState> = _uiState
     private var currentDocumentId: String? = null
+    private var documentType: String = "TXT"
+
+    private val converter = com.ceo3.docs.domain.DocumentConverter(application)
+    private val ocrEngine = com.ceo3.docs.domain.OcrEngine()
 
     fun loadDocument(id: String) {
         currentDocumentId = id
         viewModelScope.launch {
-            val file = File(getApplication<android.app.Application>().filesDir, "doc_$id.txt")
+            val dao = com.ceo3.docs.data.local.DocDatabase.getDatabase(getApplication()).documentDao()
+            val docEntity = dao.getDocumentById(id)
+            documentType = docEntity?.type ?: "TXT"
+
+            val ext = if (documentType == "PDF") "pdf" else "txt"
+            val file = File(getApplication<android.app.Application>().filesDir, "doc_${id}.$ext")
+            
             if (file.exists()) {
-                val content = file.readText()
-                _uiState.value = _uiState.value.copy(content = content, title = "Document $id")
+                val content = if (documentType == "PDF") {
+                    val ocrResult = converter.pdfToText(file, ocrEngine)
+                    ocrResult.getOrDefault("")
+                } else {
+                    file.readText()
+                }
+                _uiState.value = _uiState.value.copy(content = content, title = docEntity?.title ?: "Document $id")
             } else {
-                _uiState.value = _uiState.value.copy(content = "", title = "New Document")
+                _uiState.value = _uiState.value.copy(content = "", title = docEntity?.title ?: "New Document")
             }
         }
     }
@@ -44,8 +59,14 @@ class EditorViewModel(application: android.app.Application) : AndroidViewModel(a
     fun saveDocument() {
         val id = currentDocumentId ?: return
         viewModelScope.launch {
-            val file = File(getApplication<android.app.Application>().filesDir, "doc_$id.txt")
-            file.writeText(_uiState.value.content)
+            val ext = if (documentType == "PDF") "pdf" else "txt"
+            val file = File(getApplication<android.app.Application>().filesDir, "doc_${id}.$ext")
+            
+            if (documentType == "PDF") {
+                converter.textToPdf(_uiState.value.content, file)
+            } else {
+                file.writeText(_uiState.value.content)
+            }
             
             // Also update room DB
             val dao = com.ceo3.docs.data.local.DocDatabase.getDatabase(getApplication()).documentDao()
@@ -53,7 +74,7 @@ class EditorViewModel(application: android.app.Application) : AndroidViewModel(a
                 com.ceo3.docs.data.local.DocumentEntity(
                     id = id,
                     title = _uiState.value.title,
-                    type = "TXT",
+                    type = documentType,
                     lastModified = System.currentTimeMillis(),
                     isPinned = false,
                     tags = "Personal"
