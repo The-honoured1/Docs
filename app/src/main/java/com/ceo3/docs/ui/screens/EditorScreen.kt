@@ -12,17 +12,54 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
+import java.io.File
 
-class EditorViewModel : ViewModel() {
+class EditorViewModel(application: android.app.Application) : AndroidViewModel(application) {
     private val _uiState = MutableStateFlow(EditorUiState())
     val uiState: StateFlow<EditorUiState> = _uiState
+    private var currentDocumentId: String? = null
+
+    fun loadDocument(id: String) {
+        currentDocumentId = id
+        viewModelScope.launch {
+            val file = File(getApplication<android.app.Application>().filesDir, "doc_$id.txt")
+            if (file.exists()) {
+                val content = file.readText()
+                _uiState.value = _uiState.value.copy(content = content, title = "Document $id")
+            } else {
+                _uiState.value = _uiState.value.copy(content = "", title = "New Document")
+            }
+        }
+    }
 
     fun onContentChanged(newContent: String) {
         _uiState.value = _uiState.value.copy(content = newContent)
+    }
+
+    fun saveDocument() {
+        val id = currentDocumentId ?: return
+        viewModelScope.launch {
+            val file = File(getApplication<android.app.Application>().filesDir, "doc_$id.txt")
+            file.writeText(_uiState.value.content)
+            
+            // Also update room DB
+            val dao = com.ceo3.docs.data.local.DocDatabase.getDatabase(getApplication()).documentDao()
+            dao.insertDocument(
+                com.ceo3.docs.data.local.DocumentEntity(
+                    id = id,
+                    title = _uiState.value.title,
+                    type = "TXT",
+                    lastModified = System.currentTimeMillis(),
+                    isPinned = false,
+                    tags = "Personal"
+                )
+            )
+        }
     }
 }
 
@@ -38,8 +75,12 @@ data class EditorUiState(
 fun EditorScreen(
     documentId: String,
     onNavigateBack: () -> Unit,
-    viewModel: EditorViewModel = viewModel()
+    viewModel: EditorViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
 ) {
+    LaunchedEffect(documentId) {
+        viewModel.loadDocument(documentId)
+    }
+
     val state by viewModel.uiState.collectAsState()
 
     Scaffold(
@@ -48,7 +89,10 @@ fun EditorScreen(
                 TopAppBar(
                     title = { Text(state.title) },
                     navigationIcon = {
-                        IconButton(onClick = onNavigateBack) {
+                        IconButton(onClick = { 
+                            viewModel.saveDocument()
+                            onNavigateBack() 
+                        }) {
                             Icon(Icons.Filled.ArrowBack, contentDescription = "Back")
                         }
                     }
