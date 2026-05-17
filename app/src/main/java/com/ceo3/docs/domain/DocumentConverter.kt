@@ -12,8 +12,23 @@ class DocumentConverter(private val context: Context) {
      * Converts a list of images (JPEGs/PNGs) into a multi-page PDF.
      */
     fun imagesToPdf(imageUris: List<String>, outputFile: File): Result<File> {
-        // Implementation would use standard Android PDF APIs or lightweight library
-        return Result.success(outputFile)
+        return try {
+            val document = android.graphics.pdf.PdfDocument()
+            for ((index, uri) in imageUris.withIndex()) {
+                val bitmap = android.graphics.BitmapFactory.decodeFile(uri) ?: continue
+                val pageInfo = android.graphics.pdf.PdfDocument.PageInfo.Builder(bitmap.width, bitmap.height, index + 1).create()
+                val page = document.startPage(pageInfo)
+                page.canvas.drawBitmap(bitmap, 0f, 0f, null)
+                document.finishPage(page)
+            }
+            java.io.FileOutputStream(outputFile).use { out ->
+                document.writeTo(out)
+            }
+            document.close()
+            Result.success(outputFile)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
     }
 
     /**

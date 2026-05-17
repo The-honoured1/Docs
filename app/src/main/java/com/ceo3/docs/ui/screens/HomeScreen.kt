@@ -14,32 +14,32 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
 
 data class DocumentModel(val id: String, val title: String, val type: String, val lastModified: String, val isPinned: Boolean)
 
-class HomeViewModel : ViewModel() {
+class HomeViewModel(application: android.app.Application) : AndroidViewModel(application) {
+    private val dao = com.ceo3.docs.data.local.DocDatabase.getDatabase(application).documentDao()
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState
 
     init {
-        loadDocuments()
+        viewModelScope.launch {
+            dao.getAllDocuments().collect { docs ->
+                _uiState.value = HomeUiState(
+                    pinnedDocs = docs.filter { it.isPinned }.map { it.toModel() },
+                    recentDocs = docs.filter { !it.isPinned }.map { it.toModel() }
+                )
+            }
+        }
     }
 
-    private fun loadDocuments() {
-        val dummyData = listOf(
-            DocumentModel("1", "Physics Notes", "PDF", "2 hrs ago", true),
-            DocumentModel("2", "Job Resume", "DOCX", "1 day ago", true),
-            DocumentModel("3", "Receipt - Dinner", "JPG", "3 days ago", false),
-            DocumentModel("4", "Project Plan", "PDF", "1 week ago", false)
-        )
-        _uiState.value = HomeUiState(
-            pinnedDocs = dummyData.filter { it.isPinned },
-            recentDocs = dummyData.filter { !it.isPinned }
-        )
+    private fun com.ceo3.docs.data.local.DocumentEntity.toModel(): DocumentModel {
+        return DocumentModel(id, title, type, "Last modified: $lastModified", isPinned)
     }
 }
 
@@ -53,7 +53,7 @@ data class HomeUiState(
 fun HomeScreen(
     onNavigateToEditor: (String) -> Unit,
     onNavigateToScanner: () -> Unit,
-    viewModel: HomeViewModel = viewModel()
+    viewModel: HomeViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
 

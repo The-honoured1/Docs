@@ -2,6 +2,7 @@ package com.ceo3.docs.ui.screens
 
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageCapture
+import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
@@ -28,7 +29,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import java.io.File
 import java.util.concurrent.Executor
+import android.util.Log
 
 class ScannerViewModel : ViewModel() {
     private val _uiState = MutableStateFlow(ScannerUiState())
@@ -141,8 +144,21 @@ fun ScannerScreen(
             // Capture button
             Button(
                 onClick = {
-                    // Mocking capture
-                    viewModel.onImageCaptured("mock_uri_${System.currentTimeMillis()}")
+                    val file = File(context.cacheDir, "scan_${System.currentTimeMillis()}.jpg")
+                    val outputOptions = ImageCapture.OutputFileOptions.Builder(file).build()
+                    val executor = ContextCompat.getMainExecutor(context)
+                    imageCapture?.takePicture(
+                        outputOptions,
+                        executor,
+                        object : ImageCapture.OnImageSavedCallback {
+                            override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
+                                viewModel.onImageCaptured(file.absolutePath)
+                            }
+                            override fun onError(exception: ImageCaptureException) {
+                                Log.e("Scanner", "Capture failed", exception)
+                            }
+                        }
+                    )
                 },
                 shape = CircleShape,
                 modifier = Modifier.size(72.dp),
