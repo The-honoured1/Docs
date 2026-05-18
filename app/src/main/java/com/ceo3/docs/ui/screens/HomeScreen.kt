@@ -1,5 +1,7 @@
 package com.ceo3.docs.ui.screens
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -8,8 +10,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
-import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
@@ -19,6 +21,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -30,7 +33,13 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
-data class DocumentModel(val id: String, val title: String, val type: String, val lastModified: String, val isPinned: Boolean)
+data class DocumentModel(
+    val id: String,
+    val title: String,
+    val type: String,
+    val lastModified: String,
+    val isPinned: Boolean
+)
 
 class HomeViewModel(application: android.app.Application) : AndroidViewModel(application) {
     private val dao = com.ceo3.docs.data.local.DocDatabase.getDatabase(application).documentDao()
@@ -68,28 +77,21 @@ fun HomeScreen(
 ) {
     val state by viewModel.uiState.collectAsState()
     val scrollState = rememberScrollState()
-    val context = androidx.compose.ui.platform.LocalContext.current
     var searchQuery by remember { mutableStateOf("") }
 
     val documentPickerLauncher = rememberLauncherForActivityResult(
-        contract = androidx.activity.result.contract.ActivityResultContracts.OpenDocument(),
-        onResult = { uri ->
-            uri?.let {
-                onNavigateToEditor(it.toString())
-            }
-        }
+        contract = ActivityResultContracts.OpenDocument(),
+        onResult = { uri -> uri?.let { onNavigateToEditor(it.toString()) } }
     )
 
-    Scaffold(
-        containerColor = com.ceo3.docs.ui.theme.BackgroundLight
-    ) { paddingValues ->
+    Scaffold(containerColor = MaterialTheme.colorScheme.background) { paddingValues ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
                 .verticalScroll(scrollState)
         ) {
-            // Greeting Text
+            // ── Greeting ──────────────────────────────────────────────────
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -98,24 +100,26 @@ fun HomeScreen(
                 Text(
                     text = "Welcome,",
                     style = MaterialTheme.typography.headlineMedium,
-                    color = Color.Gray
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
                     text = "What would you like\nto do?",
                     style = MaterialTheme.typography.displayMedium,
-                    color = Color.Black
+                    color = MaterialTheme.colorScheme.onBackground
                 )
             }
 
-            // Donation Banner
+            // ── Donation Banner ───────────────────────────────────────────
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 24.dp)
                     .padding(bottom = 24.dp)
-                    .clickable { /* TODO: Open Donation Link */ },
+                    .clickable { /* TODO: open donation URL */ },
                 shape = RoundedCornerShape(24.dp),
-                colors = CardDefaults.cardColors(containerColor = com.ceo3.docs.ui.theme.AccentPurple)
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+                )
             ) {
                 Row(
                     modifier = Modifier.padding(20.dp).fillMaxWidth(),
@@ -125,7 +129,7 @@ fun HomeScreen(
                         modifier = Modifier
                             .size(48.dp)
                             .clip(CircleShape)
-                            .background(Color.White),
+                            .background(MaterialTheme.colorScheme.surface),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
@@ -141,20 +145,20 @@ fun HomeScreen(
                             text = "Free Forever, No Ads",
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color.Black
+                            color = MaterialTheme.colorScheme.onBackground
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = "We monetize through donations for poor children in Africa. Tap to support us.",
                             fontSize = 12.sp,
-                            color = Color.Black.copy(alpha = 0.7f),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             lineHeight = 16.sp
                         )
                     }
                 }
             }
 
-            // Grid Layout
+            // ── Action Grid ───────────────────────────────────────────────
             Column(
                 modifier = Modifier.padding(horizontal = 24.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -168,7 +172,7 @@ fun HomeScreen(
                         title = "Scan",
                         subtitle = "Documents, ID cards...",
                         icon = Icons.Outlined.DocumentScanner,
-                        backgroundColor = com.ceo3.docs.ui.theme.SoftYellow,
+                        backgroundColor = MaterialTheme.colorScheme.surfaceVariant,
                         onClick = onNavigateToScanner
                     )
                     ActionCard(
@@ -176,7 +180,7 @@ fun HomeScreen(
                         title = "Edit",
                         subtitle = "Sign, add text, mark...",
                         icon = Icons.Outlined.EditSquare,
-                        backgroundColor = com.ceo3.docs.ui.theme.BrightYellow,
+                        backgroundColor = MaterialTheme.colorScheme.secondary.copy(alpha = 0.7f),
                         onClick = { documentPickerLauncher.launch(arrayOf("application/pdf", "image/*", "text/plain")) }
                     )
                 }
@@ -187,9 +191,9 @@ fun HomeScreen(
                     ActionCard(
                         modifier = Modifier.weight(1f).aspectRatio(0.95f),
                         title = "Convert",
-                        subtitle = "PDF, DOCX, JPG, TX...",
+                        subtitle = "PDF, DOCX, JPG...",
                         icon = Icons.Outlined.Output,
-                        backgroundColor = com.ceo3.docs.ui.theme.SoftGreen,
+                        backgroundColor = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.7f),
                         onClick = { documentPickerLauncher.launch(arrayOf("*/*")) }
                     )
                     ActionCard(
@@ -197,7 +201,7 @@ fun HomeScreen(
                         title = "Tools",
                         subtitle = "Merge, split, compress...",
                         icon = Icons.Outlined.Build,
-                        backgroundColor = com.ceo3.docs.ui.theme.SoftOrange,
+                        backgroundColor = MaterialTheme.colorScheme.secondary.copy(alpha = 0.5f),
                         onClick = onNavigateToTools
                     )
                 }
@@ -205,14 +209,14 @@ fun HomeScreen(
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            // Search Bar
+            // ── Search Bar ────────────────────────────────────────────────
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 24.dp)
                     .height(56.dp)
                     .clip(RoundedCornerShape(28.dp))
-                    .background(Color.White),
+                    .background(MaterialTheme.colorScheme.surface),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
@@ -220,27 +224,38 @@ fun HomeScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.padding(horizontal = 20.dp).weight(1f)
                 ) {
-                    Icon(Icons.Outlined.Search, contentDescription = "Search", tint = Color.Gray, modifier = Modifier.size(20.dp))
+                    Icon(
+                        Icons.Outlined.Search,
+                        contentDescription = "Search",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp)
+                    )
                     Spacer(modifier = Modifier.width(12.dp))
                     Box(modifier = Modifier.fillMaxWidth()) {
                         if (searchQuery.isEmpty()) {
-                            Text("Search files", color = Color.Gray, fontSize = 16.sp)
+                            Text(
+                                "Search files",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontSize = 16.sp
+                            )
                         }
-                        androidx.compose.foundation.text.BasicTextField(
+                        BasicTextField(
                             value = searchQuery,
                             onValueChange = { searchQuery = it },
-                            textStyle = androidx.compose.ui.text.TextStyle(fontSize = 16.sp, color = Color.Black),
+                            textStyle = TextStyle(
+                                fontSize = 16.sp,
+                                color = MaterialTheme.colorScheme.onSurface
+                            ),
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = true
                         )
                     }
                 }
-                
                 if (searchQuery.isNotEmpty()) {
                     Icon(
-                        imageVector = Icons.Outlined.Close, 
-                        contentDescription = "Clear Search", 
-                        tint = Color.Gray,
+                        imageVector = Icons.Outlined.Close,
+                        contentDescription = "Clear",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier
                             .padding(end = 20.dp)
                             .size(20.dp)
@@ -250,17 +265,18 @@ fun HomeScreen(
             }
 
             Spacer(modifier = Modifier.height(32.dp))
-            
-            val displayDocs = state.recentDocs.filter { 
-                searchQuery.isEmpty() || it.title.contains(searchQuery, ignoreCase = true) 
+
+            // ── Recent Files ──────────────────────────────────────────────
+            val displayDocs = state.recentDocs.filter {
+                searchQuery.isEmpty() || it.title.contains(searchQuery, ignoreCase = true)
             }
-            
+
             if (displayDocs.isNotEmpty() || searchQuery.isNotEmpty()) {
                 Text(
                     text = "Recent files",
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color.Black,
+                    color = MaterialTheme.colorScheme.onBackground,
                     modifier = Modifier.padding(horizontal = 24.dp)
                 )
                 Spacer(modifier = Modifier.height(16.dp))
@@ -274,7 +290,7 @@ fun HomeScreen(
                     }
                 }
             }
-            
+
             Spacer(modifier = Modifier.height(100.dp))
         }
     }
@@ -302,7 +318,7 @@ fun ActionCard(
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                tint = Color.Black.copy(alpha = 0.5f),
+                tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f),
                 modifier = Modifier.size(28.dp)
             )
             Spacer(modifier = Modifier.weight(1f))
@@ -310,13 +326,13 @@ fun ActionCard(
                 text = title,
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color.Black
+                color = MaterialTheme.colorScheme.onBackground
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = subtitle,
                 fontSize = 11.sp,
-                color = Color.Black.copy(alpha = 0.6f),
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
                 textAlign = TextAlign.Start,
                 lineHeight = 14.sp,
                 maxLines = 2,
@@ -329,24 +345,14 @@ fun ActionCard(
 @Composable
 fun RecentFileCard(doc: DocumentModel, onClick: () -> Unit) {
     val bgColor = when (doc.type.uppercase()) {
-        "XLS", "XLSX" -> Color(0xFFF3F0E6)
-        "JPG", "PNG" -> Color(0xFFEEF6E8)
-        "DOC", "DOCX" -> Color(0xFFFDF7E3)
-        else -> Color.White
-    }
-    
-    val iconColor = when (doc.type.uppercase()) {
-        "XLS", "XLSX" -> Color(0xFFA19C83)
-        "JPG", "PNG" -> Color(0xFF7CB342)
-        "DOC", "DOCX" -> Color(0xFFFFB300)
-        else -> Color.Gray
+        "XLS", "XLSX" -> MaterialTheme.colorScheme.tertiary.copy(alpha = 0.3f)
+        "JPG", "PNG"  -> MaterialTheme.colorScheme.secondary.copy(alpha = 0.3f)
+        "DOC", "DOCX" -> MaterialTheme.colorScheme.secondary.copy(alpha = 0.5f)
+        else           -> MaterialTheme.colorScheme.surface
     }
 
     Card(
-        modifier = Modifier
-            .width(140.dp)
-            .height(180.dp)
-            .clickable { onClick() },
+        modifier = Modifier.width(140.dp).height(180.dp).clickable { onClick() },
         shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(containerColor = bgColor)
     ) {
@@ -358,7 +364,7 @@ fun RecentFileCard(doc: DocumentModel, onClick: () -> Unit) {
             Icon(
                 imageVector = Icons.Filled.Description,
                 contentDescription = null,
-                tint = iconColor,
+                tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(32.dp)
             )
             Spacer(modifier = Modifier.weight(1f))
@@ -366,17 +372,13 @@ fun RecentFileCard(doc: DocumentModel, onClick: () -> Unit) {
                 text = doc.title,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color.Black,
+                color = MaterialTheme.colorScheme.onBackground,
                 textAlign = TextAlign.Start,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis
             )
             Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = doc.type,
-                fontSize = 11.sp,
-                color = Color.Gray
-            )
+            Text(text = doc.type, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
