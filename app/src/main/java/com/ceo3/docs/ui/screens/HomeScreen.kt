@@ -72,7 +72,6 @@ data class HomeUiState(
 fun HomeScreen(
     onNavigateToEditor: (String) -> Unit,
     onNavigateToScanner: () -> Unit,
-    onNavigateToTools: () -> Unit,
     viewModel: HomeViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -184,27 +183,14 @@ fun HomeScreen(
                         onClick = { documentPickerLauncher.launch(arrayOf("application/pdf", "image/*", "text/plain")) }
                     )
                 }
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    ActionCard(
-                        modifier = Modifier.weight(1f).aspectRatio(0.95f),
-                        title = "Convert",
-                        subtitle = "PDF, DOCX, JPG...",
-                        icon = Icons.Outlined.Output,
-                        backgroundColor = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.7f),
-                        onClick = { documentPickerLauncher.launch(arrayOf("*/*")) }
-                    )
-                    ActionCard(
-                        modifier = Modifier.weight(1f).aspectRatio(0.95f),
-                        title = "Tools",
-                        subtitle = "Merge, split, compress...",
-                        icon = Icons.Outlined.Build,
-                        backgroundColor = MaterialTheme.colorScheme.secondary.copy(alpha = 0.5f),
-                        onClick = onNavigateToTools
-                    )
-                }
+                ActionCard(
+                    modifier = Modifier.fillMaxWidth().height(110.dp),
+                    title = "Convert",
+                    subtitle = "Convert PDF, Word documents, images, and raw text",
+                    icon = Icons.Outlined.Output,
+                    backgroundColor = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.7f),
+                    onClick = { documentPickerLauncher.launch(arrayOf("*/*")) }
+                )
             }
 
             Spacer(modifier = Modifier.height(32.dp))

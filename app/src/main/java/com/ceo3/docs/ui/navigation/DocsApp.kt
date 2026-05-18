@@ -7,7 +7,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.outlined.Layers
 import androidx.compose.material3.*
@@ -26,11 +25,10 @@ import com.ceo3.docs.ui.screens.EditorScreen
 import com.ceo3.docs.ui.screens.FilesScreen
 import com.ceo3.docs.ui.screens.HomeScreen
 import com.ceo3.docs.ui.screens.ScannerScreen
-import com.ceo3.docs.ui.screens.ToolsScreen
+
 
 sealed class Screen(val route: String) {
     object Home    : Screen("home")
-    object Tools   : Screen("tools")
     object Files   : Screen("files")
     object Editor  : Screen("editor/{docId}") {
         fun createRoute(docId: String) = "editor/$docId"
@@ -49,7 +47,7 @@ fun DocsApp() {
             val currentRoute = navBackStackEntry?.destination?.route
 
             val showBottomBar = currentRoute in listOf(
-                Screen.Home.route, Screen.Files.route, Screen.Tools.route
+                Screen.Home.route, Screen.Files.route
             )
 
             if (showBottomBar) {
@@ -84,17 +82,6 @@ fun DocsApp() {
                             selected = currentRoute == Screen.Files.route,
                             onClick = {
                                 navController.navigate(Screen.Files.route) {
-                                    popUpTo(navController.graph.startDestinationId) { saveState = true }
-                                    launchSingleTop = true; restoreState = true
-                                }
-                            }
-                        )
-                        NavIcon(
-                            icon = Icons.Filled.Build,
-                            label = "Tools",
-                            selected = currentRoute == Screen.Tools.route,
-                            onClick = {
-                                navController.navigate(Screen.Tools.route) {
                                     popUpTo(navController.graph.startDestinationId) { saveState = true }
                                     launchSingleTop = true; restoreState = true
                                 }
@@ -155,12 +142,8 @@ fun DocsNavHost(navController: NavHostController, modifier: Modifier = Modifier)
         composable(Screen.Home.route) {
             HomeScreen(
                 onNavigateToEditor  = { docId -> navController.navigate(Screen.Editor.createRoute(docId)) },
-                onNavigateToScanner = { navController.navigate(Screen.Scanner.route) },
-                onNavigateToTools   = { navController.navigate(Screen.Tools.route) }
+                onNavigateToScanner = { navController.navigate(Screen.Scanner.route) }
             )
-        }
-        composable(Screen.Tools.route) {
-            ToolsScreen(onToolSelected = {})
         }
         composable(Screen.Files.route) {
             FilesScreen(

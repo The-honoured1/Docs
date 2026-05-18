@@ -20,7 +20,9 @@ abstract class DocDatabase : RoomDatabase() {
                     context.applicationContext,
                     DocDatabase::class.java,
                     "docs_database"
-                ).build()
+                )
+                .fallbackToDestructiveMigration()
+                .build()
                 INSTANCE = instance
                 instance
             }

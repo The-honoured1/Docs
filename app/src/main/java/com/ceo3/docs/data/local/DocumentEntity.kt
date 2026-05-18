@@ -11,5 +11,7 @@ data class DocumentEntity(
     val type: String,
     val lastModified: Long,
     val isPinned: Boolean,
-    val tags: String // Comma separated for simplicity
+    val tags: String, // Comma separated for simplicity
+    val accentTheme: String = "classic", // classic, sepia, mint, charcoal
+    val accentColor: String = "blue"     // red, blue, green, orange, purple
 )
