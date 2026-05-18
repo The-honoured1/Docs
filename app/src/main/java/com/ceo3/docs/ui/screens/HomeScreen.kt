@@ -63,11 +63,13 @@ data class HomeUiState(
 fun HomeScreen(
     onNavigateToEditor: (String) -> Unit,
     onNavigateToScanner: () -> Unit,
+    onNavigateToTools: () -> Unit,
     viewModel: HomeViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
     val scrollState = rememberScrollState()
     val context = androidx.compose.ui.platform.LocalContext.current
+    var searchQuery by remember { mutableStateOf("") }
 
     val documentPickerLauncher = rememberLauncherForActivityResult(
         contract = androidx.activity.result.contract.ActivityResultContracts.OpenDocument(),
@@ -79,7 +81,7 @@ fun HomeScreen(
     )
 
     Scaffold(
-        containerColor = Color(0xFFF7F8F8)
+        containerColor = com.ceo3.docs.ui.theme.BackgroundLight
     ) { paddingValues ->
         Column(
             modifier = Modifier
@@ -94,18 +96,14 @@ fun HomeScreen(
                     .padding(horizontal = 24.dp, vertical = 32.dp)
             ) {
                 Text(
-                    text = "Hi Nixtio,",
-                    fontSize = 32.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = Color.Gray,
-                    lineHeight = 36.sp
+                    text = "Welcome,",
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = Color.Gray
                 )
                 Text(
-                    text = "How can I help\nyou today?",
-                    fontSize = 36.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.Black,
-                    lineHeight = 40.sp
+                    text = "What would you like\nto do?",
+                    style = MaterialTheme.typography.displayMedium,
+                    color = Color.Black
                 )
             }
 
@@ -123,7 +121,7 @@ fun HomeScreen(
                         title = "Scan",
                         subtitle = "Documents, ID cards...",
                         icon = Icons.Outlined.DocumentScanner,
-                        backgroundColor = Color.White,
+                        backgroundColor = com.ceo3.docs.ui.theme.SoftYellow,
                         onClick = onNavigateToScanner
                     )
                     ActionCard(
@@ -131,7 +129,7 @@ fun HomeScreen(
                         title = "Edit",
                         subtitle = "Sign, add text, mark...",
                         icon = Icons.Outlined.EditSquare,
-                        backgroundColor = Color.White,
+                        backgroundColor = com.ceo3.docs.ui.theme.BrightYellow,
                         onClick = { documentPickerLauncher.launch(arrayOf("application/pdf", "image/*", "text/plain")) }
                     )
                 }
@@ -144,16 +142,16 @@ fun HomeScreen(
                         title = "Convert",
                         subtitle = "PDF, DOCX, JPG, TX...",
                         icon = Icons.Outlined.Output,
-                        backgroundColor = Color.White,
+                        backgroundColor = com.ceo3.docs.ui.theme.SoftGreen,
                         onClick = { documentPickerLauncher.launch(arrayOf("*/*")) }
                     )
                     ActionCard(
                         modifier = Modifier.weight(1f).aspectRatio(0.95f),
-                        title = "Ask AI",
-                        subtitle = "Summarize, finish wri...",
-                        icon = Icons.Outlined.AutoAwesome,
-                        backgroundColor = Color.White,
-                        onClick = { }
+                        title = "Tools",
+                        subtitle = "Merge, split, compress...",
+                        icon = Icons.Outlined.Build,
+                        backgroundColor = com.ceo3.docs.ui.theme.SoftOrange,
+                        onClick = onNavigateToTools
                     )
                 }
             }
@@ -167,33 +165,50 @@ fun HomeScreen(
                     .padding(horizontal = 24.dp)
                     .height(56.dp)
                     .clip(RoundedCornerShape(28.dp))
-                    .background(Color.White)
-                    .clickable { },
+                    .background(Color.White),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(start = 20.dp)
+                    modifier = Modifier.padding(horizontal = 20.dp).weight(1f)
                 ) {
                     Icon(Icons.Outlined.Search, contentDescription = "Search", tint = Color.Gray, modifier = Modifier.size(20.dp))
                     Spacer(modifier = Modifier.width(12.dp))
-                    Text("Search", color = Color.Gray, fontSize = 16.sp)
+                    Box(modifier = Modifier.fillMaxWidth()) {
+                        if (searchQuery.isEmpty()) {
+                            Text("Search files", color = Color.Gray, fontSize = 16.sp)
+                        }
+                        androidx.compose.foundation.text.BasicTextField(
+                            value = searchQuery,
+                            onValueChange = { searchQuery = it },
+                            textStyle = androidx.compose.ui.text.TextStyle(fontSize = 16.sp, color = Color.Black),
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
+                        )
+                    }
                 }
                 
-                Icon(
-                    imageVector = Icons.Outlined.Mic, 
-                    contentDescription = "Voice Search", 
-                    tint = Color.Gray,
-                    modifier = Modifier
-                        .padding(end = 20.dp)
-                        .size(20.dp)
-                )
+                if (searchQuery.isNotEmpty()) {
+                    Icon(
+                        imageVector = Icons.Outlined.Close, 
+                        contentDescription = "Clear Search", 
+                        tint = Color.Gray,
+                        modifier = Modifier
+                            .padding(end = 20.dp)
+                            .size(20.dp)
+                            .clickable { searchQuery = "" }
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(32.dp))
             
-            if (state.recentDocs.isNotEmpty()) {
+            val displayDocs = state.recentDocs.filter { 
+                searchQuery.isEmpty() || it.title.contains(searchQuery, ignoreCase = true) 
+            }
+            
+            if (displayDocs.isNotEmpty() || searchQuery.isNotEmpty()) {
                 Text(
                     text = "Recent files",
                     fontSize = 20.sp,
@@ -207,7 +222,7 @@ fun HomeScreen(
                     contentPadding = PaddingValues(horizontal = 24.dp),
                     horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    items(state.recentDocs) { doc ->
+                    items(displayDocs) { doc ->
                         RecentFileCard(doc = doc, onClick = { onNavigateToEditor(doc.id) })
                     }
                 }

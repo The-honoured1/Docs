@@ -142,7 +142,8 @@ fun DocsNavHost(navController: NavHostController, modifier: Modifier = Modifier)
         composable(Screen.Home.route) {
             HomeScreen(
                 onNavigateToEditor = { docId -> navController.navigate(Screen.Editor.createRoute(docId)) },
-                onNavigateToScanner = { navController.navigate(Screen.Scanner.route) }
+                onNavigateToScanner = { navController.navigate(Screen.Scanner.route) },
+                onNavigateToTools = { navController.navigate(Screen.Tools.route) }
             )
         }
         composable(Screen.Tools.route) {
