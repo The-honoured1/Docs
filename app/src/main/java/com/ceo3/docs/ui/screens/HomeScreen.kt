@@ -142,7 +142,7 @@ fun HomeScreen(
                         modifier = Modifier.weight(1f).aspectRatio(0.85f),
                         title = "Edit",
                         subtitle = "Sign, Add text, Add images, Markup, Hide, Recognize...",
-                        icon = Icons.Filled.EditSquare,
+                        icon = Icons.Filled.Edit,
                         backgroundColor = Color(0xFFFFDF70),
                         onClick = { documentPickerLauncher.launch(arrayOf("application/pdf", "image/*", "text/plain")) }
                     )
