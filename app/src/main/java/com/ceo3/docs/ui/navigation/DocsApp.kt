@@ -92,7 +92,7 @@ fun DocsApp() {
                             }
                         )
                         Icon(
-                            imageVector = Icons.Filled.Person,
+                            imageVector = Icons.Filled.Build,
                             contentDescription = "Tools",
                             tint = if (currentRoute == Screen.Tools.route) Color.White else Color.Gray,
                             modifier = Modifier.size(28.dp).clickable {

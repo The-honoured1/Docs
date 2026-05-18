@@ -107,6 +107,53 @@ fun HomeScreen(
                 )
             }
 
+            // Donation Banner
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp)
+                    .padding(bottom = 24.dp)
+                    .clickable { /* TODO: Open Donation Link */ },
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(containerColor = com.ceo3.docs.ui.theme.AccentPurple)
+            ) {
+                Row(
+                    modifier = Modifier.padding(20.dp).fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .clip(CircleShape)
+                            .background(Color.White),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Favorite,
+                            contentDescription = "Donate",
+                            tint = Color(0xFFFF5252),
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Free Forever, No Ads",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.Black
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "We monetize through donations for poor children in Africa. Tap to support us.",
+                            fontSize = 12.sp,
+                            color = Color.Black.copy(alpha = 0.7f),
+                            lineHeight = 16.sp
+                        )
+                    }
+                }
+            }
+
             // Grid Layout
             Column(
                 modifier = Modifier.padding(horizontal = 24.dp),
