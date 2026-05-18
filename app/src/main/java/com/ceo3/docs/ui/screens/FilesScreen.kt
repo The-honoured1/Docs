@@ -89,7 +89,7 @@ fun FilesScreen(
                 }
             }
 
-            Divider()
+            HorizontalDivider()
 
             // File List
             LazyColumn(
@@ -105,7 +105,7 @@ fun FilesScreen(
                             onClick = { onDocumentClick(item.id) }
                         )
                     }
-                    Divider(modifier = Modifier.padding(start = 56.dp))
+                    HorizontalDivider(modifier = Modifier.padding(start = 56.dp))
                 }
                 item { Spacer(modifier = Modifier.height(80.dp)) }
             }

@@ -6,10 +6,10 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.MergeType
 import androidx.compose.material.icons.filled.Compress
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Image
-import androidx.compose.material.icons.filled.MergeType
 import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.Scanner
 import androidx.compose.material.icons.filled.Splitscreen
@@ -29,7 +29,7 @@ val ConversionTools = listOf(
     ToolItem("scan_pdf", "Scan → PDF", Icons.Filled.Scanner),
     ToolItem("pdf_doc", "PDF → DOC", Icons.Filled.Description),
     ToolItem("doc_pdf", "DOC → PDF", Icons.Filled.PictureAsPdf),
-    ToolItem("merge_pdf", "Merge PDFs", Icons.Filled.MergeType),
+    ToolItem("merge_pdf", "Merge PDFs", Icons.AutoMirrored.Filled.MergeType),
     ToolItem("split_pdf", "Split PDFs", Icons.Filled.Splitscreen),
     ToolItem("compress_pdf", "Compress PDF", Icons.Filled.Compress)
 )

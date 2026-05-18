@@ -1,19 +1,29 @@
 package com.ceo3.docs.ui.screens
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Description
-import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.HelpOutline
+import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -56,100 +66,258 @@ fun HomeScreen(
     viewModel: HomeViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
+    val scrollState = rememberScrollState()
 
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Docs", fontWeight = FontWeight.Bold) },
-                actions = {
-                    IconButton(onClick = { /* TODO: Search */ }) {
-                        Icon(Icons.Filled.Search, contentDescription = "Search")
-                    }
-                }
-            )
-        },
-        floatingActionButton = {
-            ExtendedFloatingActionButton(
-                onClick = onNavigateToScanner,
-                icon = { Icon(Icons.Filled.Description, contentDescription = "Scan") },
-                text = { Text("Scan") }
-            )
-        }
+        containerColor = Color(0xFFF7F8F8)
     ) { paddingValues ->
-        LazyColumn(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+                .verticalScroll(scrollState)
         ) {
-            item { Spacer(modifier = Modifier.height(8.dp)) }
-            
-            if (state.pinnedDocs.isNotEmpty()) {
-                item {
-                    Text("Pinned", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        items(state.pinnedDocs) { doc ->
-                            DocumentCard(doc = doc, onClick = { onNavigateToEditor(doc.id) })
-                        }
-                    }
+            // Top Bar
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp, vertical = 24.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.HelpOutline, 
+                    contentDescription = "Help", 
+                    modifier = Modifier.size(28.dp).clickable { }
+                )
+                Box {
+                    Icon(
+                        imageVector = Icons.Outlined.Notifications, 
+                        contentDescription = "Notifications", 
+                        modifier = Modifier.size(28.dp).clickable { }
+                    )
+                    // Notification badge
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(top = 2.dp, end = 2.dp)
+                            .size(10.dp)
+                            .clip(CircleShape)
+                            .background(Color.Red)
+                    )
                 }
             }
 
-            item {
-                Text("Recent", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            // Grid Layout
+            Column(
+                modifier = Modifier.padding(horizontal = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    ActionCard(
+                        modifier = Modifier.weight(1f).aspectRatio(0.85f),
+                        title = "Scan",
+                        subtitle = "Documents, ID card, Measure, Count, Passport...",
+                        icon = Icons.Filled.DocumentScanner,
+                        backgroundColor = Color(0xFFEBE7CE),
+                        onClick = onNavigateToScanner
+                    )
+                    ActionCard(
+                        modifier = Modifier.weight(1f).aspectRatio(0.85f),
+                        title = "Edit",
+                        subtitle = "Sign, Add text, Add images, Markup, Hide, Recognize...",
+                        icon = Icons.Filled.EditSquare,
+                        backgroundColor = Color(0xFFFFDF70),
+                        onClick = { /* TODO */ }
+                    )
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    ActionCard(
+                        modifier = Modifier.weight(1f).aspectRatio(0.85f),
+                        title = "Convert",
+                        subtitle = "pdf, jpg, doc, txt, xls, ppt",
+                        icon = Icons.Filled.Output,
+                        backgroundColor = Color(0xFFBCE3A6),
+                        onClick = { /* TODO */ }
+                    )
+                    Spacer(modifier = Modifier.weight(1f))
+                }
             }
 
-            items(state.recentDocs) { doc ->
-                DocumentListItem(doc = doc, onClick = { onNavigateToEditor(doc.id) })
+            Spacer(modifier = Modifier.height(32.dp))
+
+            // Search Bar
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                TextField(
+                    value = "",
+                    onValueChange = {},
+                    placeholder = { Text("Search", color = Color.Gray) },
+                    leadingIcon = { Icon(Icons.Filled.Search, contentDescription = "Search", tint = Color.Gray) },
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(56.dp)
+                        .clip(RoundedCornerShape(28.dp)),
+                    colors = TextFieldDefaults.colors(
+                        focusedContainerColor = Color.White,
+                        unfocusedContainerColor = Color.White,
+                        focusedIndicatorColor = Color.Transparent,
+                        unfocusedIndicatorColor = Color.Transparent,
+                    ),
+                    singleLine = true
+                )
+                
+                Box(
+                    modifier = Modifier
+                        .size(56.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFFFFB84D))
+                        .clickable { },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Filled.Tune, contentDescription = "Filter", tint = Color.Black)
+                }
+            }
+
+            Spacer(modifier = Modifier.height(32.dp))
+            
+            // Recent files list mock data for UI visual completion
+            val displayDocs = if (state.recentDocs.isNotEmpty()) {
+                state.recentDocs
+            } else {
+                listOf(
+                    DocumentModel("1", "Strategy-Pitch-Final.xls", "XLS", "Just now", false),
+                    DocumentModel("2", "user-journey-01.jpg", "JPG", "1h ago", false),
+                    DocumentModel("3", "Invoice-oct-2024.doc", "DOC", "2h ago", false)
+                )
+            }
+
+            LazyRow(
+                modifier = Modifier.fillMaxWidth(),
+                contentPadding = PaddingValues(horizontal = 24.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                items(displayDocs) { doc ->
+                    RecentFileCard(doc = doc, onClick = { onNavigateToEditor(doc.id) })
+                }
             }
             
-            item { Spacer(modifier = Modifier.height(80.dp)) }
+            Spacer(modifier = Modifier.height(100.dp))
         }
     }
 }
 
 @Composable
-fun DocumentCard(doc: DocumentModel, onClick: () -> Unit) {
+fun ActionCard(
+    modifier: Modifier = Modifier,
+    title: String,
+    subtitle: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    backgroundColor: Color,
+    onClick: () -> Unit
+) {
     Card(
-        modifier = Modifier
-            .size(120.dp, 160.dp)
-            .clickable { onClick() },
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
+        modifier = modifier.clickable { onClick() },
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = backgroundColor)
     ) {
         Column(
-            modifier = Modifier.padding(12.dp).fillMaxSize(),
-            verticalArrangement = Arrangement.SpaceBetween
+            modifier = Modifier.padding(16.dp).fillMaxSize(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
         ) {
-            Icon(Icons.Filled.Description, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-            Column {
-                Text(doc.title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, maxLines = 2)
-                Text(doc.type, style = MaterialTheme.typography.labelSmall)
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(CircleShape)
+                    .background(Color.White),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(icon, contentDescription = null, tint = Color.Black)
             }
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                text = title,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.Black
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = subtitle,
+                fontSize = 11.sp,
+                color = Color.Black.copy(alpha = 0.6f),
+                textAlign = TextAlign.Center,
+                lineHeight = 14.sp,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis
+            )
         }
     }
 }
 
 @Composable
-fun DocumentListItem(doc: DocumentModel, onClick: () -> Unit) {
-    Row(
+fun RecentFileCard(doc: DocumentModel, onClick: () -> Unit) {
+    val bgColor = when (doc.type.uppercase()) {
+        "XLS", "XLSX" -> Color(0xFFF3F0E6)
+        "JPG", "PNG" -> Color(0xFFEEF6E8)
+        "DOC", "DOCX" -> Color(0xFFFDF7E3)
+        else -> Color.White
+    }
+    
+    val iconColor = when (doc.type.uppercase()) {
+        "XLS", "XLSX" -> Color(0xFFA19C83)
+        "JPG", "PNG" -> Color(0xFF7CB342)
+        "DOC", "DOCX" -> Color(0xFFFFB300)
+        else -> Color.Gray
+    }
+
+    Card(
         modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onClick() }
-            .padding(vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .width(130.dp)
+            .height(150.dp)
+            .clickable { onClick() },
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = bgColor)
     ) {
-        Icon(
-            Icons.Filled.Description, 
-            contentDescription = null,
-            modifier = Modifier.size(40.dp),
-            tint = MaterialTheme.colorScheme.primary
-        )
-        Spacer(modifier = Modifier.width(16.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(doc.title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
-            Text("${doc.type} • ${doc.lastModified}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Column(
+            modifier = Modifier.padding(16.dp).fillMaxSize(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Description,
+                contentDescription = null,
+                tint = iconColor,
+                modifier = Modifier.size(40.dp)
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                text = doc.title,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Medium,
+                color = Color.Black,
+                textAlign = TextAlign.Center,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = doc.type,
+                fontSize = 11.sp,
+                color = Color.Gray
+            )
         }
     }
 }

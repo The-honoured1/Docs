@@ -2,10 +2,10 @@ package com.ceo3.docs.ui.screens
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.FormatListBulleted
 import androidx.compose.material.icons.filled.FormatBold
 import androidx.compose.material.icons.filled.FormatItalic
-import androidx.compose.material.icons.filled.FormatListBulleted
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.TableChart
 import androidx.compose.material3.*
@@ -114,7 +114,7 @@ fun EditorScreen(
                             viewModel.saveDocument()
                             onNavigateBack() 
                         }) {
-                            Icon(Icons.Filled.ArrowBack, contentDescription = "Back")
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                         }
                     }
                 )
@@ -130,7 +130,7 @@ fun EditorScreen(
                         Icon(Icons.Filled.FormatItalic, contentDescription = "Italic")
                     }
                     IconButton(onClick = { /* Add List */ }) {
-                        Icon(Icons.Filled.FormatListBulleted, contentDescription = "Bullet List")
+                        Icon(Icons.AutoMirrored.Filled.FormatListBulleted, contentDescription = "Bullet List")
                     }
                     IconButton(onClick = { /* Add Image */ }) {
                         Icon(Icons.Filled.Image, contentDescription = "Insert Image")
@@ -139,7 +139,7 @@ fun EditorScreen(
                         Icon(Icons.Filled.TableChart, contentDescription = "Insert Table")
                     }
                 }
-                Divider()
+                HorizontalDivider()
             }
         }
     ) { paddingValues ->
