@@ -1,6 +1,10 @@
 package com.ceo3.docs.ui.screens
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.FormatListBulleted
@@ -10,8 +14,13 @@ import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.TableChart
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -105,57 +114,94 @@ fun EditorScreen(
     val state by viewModel.uiState.collectAsState()
 
     Scaffold(
-        topBar = {
-            Column {
-                TopAppBar(
-                    title = { Text(state.title) },
-                    navigationIcon = {
-                        IconButton(onClick = { 
+        containerColor = Color(0xFFF7F8F8)
+    ) { paddingValues ->
+        Column(modifier = Modifier.padding(paddingValues).fillMaxSize()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(CircleShape)
+                        .background(Color.White)
+                        .clickable { 
                             viewModel.saveDocument()
                             onNavigateBack() 
-                        }) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                        }
-                    }
-                )
-                // Formatting Toolbar
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        },
+                    contentAlignment = Alignment.Center
                 ) {
-                    IconButton(onClick = { /* Toggle Bold */ }) {
-                        Icon(Icons.Filled.FormatBold, contentDescription = "Bold")
-                    }
-                    IconButton(onClick = { /* Toggle Italic */ }) {
-                        Icon(Icons.Filled.FormatItalic, contentDescription = "Italic")
-                    }
-                    IconButton(onClick = { /* Add List */ }) {
-                        Icon(Icons.AutoMirrored.Filled.FormatListBulleted, contentDescription = "Bullet List")
-                    }
-                    IconButton(onClick = { /* Add Image */ }) {
-                        Icon(Icons.Filled.Image, contentDescription = "Insert Image")
-                    }
-                    IconButton(onClick = { /* Add Table */ }) {
-                        Icon(Icons.Filled.TableChart, contentDescription = "Insert Table")
-                    }
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.Black)
                 }
-                HorizontalDivider()
+                Spacer(modifier = Modifier.width(16.dp))
+                Text(
+                    text = state.title,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.Black,
+                    modifier = Modifier.weight(1f)
+                )
+                Button(
+                    onClick = { 
+                        viewModel.saveDocument()
+                        onNavigateBack() 
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFBCE3A6)),
+                    shape = RoundedCornerShape(20.dp)
+                ) {
+                    Text("Save", color = Color.Black, fontWeight = FontWeight.Bold)
+                }
             }
-        }
-    ) { paddingValues ->
-        TextField(
-            value = state.content,
-            onValueChange = viewModel::onContentChanged,
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues),
-            placeholder = { Text("Start typing...") },
-            colors = TextFieldDefaults.colors(
-                focusedContainerColor = MaterialTheme.colorScheme.surface,
-                unfocusedContainerColor = MaterialTheme.colorScheme.surface,
-                focusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
-                unfocusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent
+
+            // Formatting Toolbar
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp, vertical = 8.dp)
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(Color.White)
+                    .padding(8.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                IconButton(onClick = { /* Toggle Bold */ }) {
+                    Icon(Icons.Filled.FormatBold, contentDescription = "Bold", tint = Color.Black)
+                }
+                IconButton(onClick = { /* Toggle Italic */ }) {
+                    Icon(Icons.Filled.FormatItalic, contentDescription = "Italic", tint = Color.Black)
+                }
+                IconButton(onClick = { /* Add List */ }) {
+                    Icon(Icons.AutoMirrored.Filled.FormatListBulleted, contentDescription = "Bullet List", tint = Color.Black)
+                }
+                IconButton(onClick = { /* Add Image */ }) {
+                    Icon(Icons.Filled.Image, contentDescription = "Insert Image", tint = Color.Black)
+                }
+                IconButton(onClick = { /* Add Table */ }) {
+                    Icon(Icons.Filled.TableChart, contentDescription = "Insert Table", tint = Color.Black)
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            TextField(
+                value = state.content,
+                onValueChange = viewModel::onContentChanged,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 24.dp)
+                    .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)),
+                placeholder = { Text("Start typing...", color = Color.Gray) },
+                colors = TextFieldDefaults.colors(
+                    focusedContainerColor = Color.White,
+                    unfocusedContainerColor = Color.White,
+                    focusedIndicatorColor = Color.Transparent,
+                    unfocusedIndicatorColor = Color.Transparent,
+                    focusedTextColor = Color.Black,
+                    unfocusedTextColor = Color.Black
+                )
             )
-        )
+        }
     }
 }

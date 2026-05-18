@@ -1,20 +1,26 @@
 package com.ceo3.docs.ui.screens
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -43,7 +49,6 @@ class FilesViewModel(application: android.app.Application) : AndroidViewModel(ap
 
     fun selectTag(tag: String) {
         _uiState.value = _uiState.value.copy(selectedTag = tag)
-        // In a real app, we would re-filter the list here based on the selected tag
     }
 }
 
@@ -62,52 +67,83 @@ fun FilesScreen(
     val state by viewModel.uiState.collectAsState()
 
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Files & Folders", fontWeight = FontWeight.Bold) },
-                actions = {
-                    IconButton(onClick = { /* TODO */ }) {
-                        Icon(Icons.Filled.Search, contentDescription = "Search")
-                    }
-                }
-            )
-        }
+        containerColor = Color(0xFFF7F8F8)
     ) { paddingValues ->
         Column(modifier = Modifier.padding(paddingValues).fillMaxSize()) {
-            // Tags Row
-            LazyRow(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp, vertical = 24.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                items(state.tags) { tag ->
-                    FilterChip(
-                        selected = state.selectedTag == tag,
-                        onClick = { viewModel.selectTag(tag) },
-                        label = { Text(tag) },
-                        shape = RoundedCornerShape(16.dp)
-                    )
+                Text(
+                    text = "Files & Folders",
+                    fontSize = 28.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.Black
+                )
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(CircleShape)
+                        .background(Color.White)
+                        .clickable { },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Filled.Search, contentDescription = "Search", tint = Color.Black)
                 }
             }
 
-            HorizontalDivider()
+            // Tags Row
+            LazyRow(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                items(state.tags) { tag ->
+                    val isSelected = state.selectedTag == tag
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(if (isSelected) Color.Black else Color.White)
+                            .clickable { viewModel.selectTag(tag) }
+                            .padding(horizontal = 20.dp, vertical = 10.dp)
+                    ) {
+                        Text(
+                            text = tag,
+                            color = if (isSelected) Color.White else Color.Black,
+                            fontWeight = FontWeight.Medium,
+                            fontSize = 14.sp
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
 
             // File List
             LazyColumn(
-                modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
-                contentPadding = PaddingValues(vertical = 8.dp)
+                modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                contentPadding = PaddingValues(bottom = 120.dp)
             ) {
                 items(state.items) { item ->
                     if (item.isFolder) {
                         FolderItem(item = item, onClick = { /* Navigate into folder */ })
                     } else {
-                        DocumentListItem(
-                            doc = DocumentModel(item.id, item.name, "PDF", "Just now", false),
+                        FileListItem(
+                            item = item,
                             onClick = { onDocumentClick(item.id) }
                         )
                     }
-                    HorizontalDivider(modifier = Modifier.padding(start = 56.dp))
                 }
-                item { Spacer(modifier = Modifier.height(80.dp)) }
+                
+                // Add dummy items if empty for UI showcasing
+                if (state.items.isEmpty()) {
+                    item { FolderItem(FileItem("d1", "Taxes 2024", true, 4), {}) }
+                    item { FolderItem(FileItem("d2", "Travel Documents", true, 2), {}) }
+                    item { FileListItem(FileItem("d3", "Contract_final.pdf", false), {}) }
+                }
             }
         }
     }
@@ -115,23 +151,52 @@ fun FilesScreen(
 
 @Composable
 fun FolderItem(item: FileItem, onClick: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onClick() }
-            .padding(vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically
+    Card(
+        modifier = Modifier.fillMaxWidth().clickable { onClick() },
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFFEBE7CE))
     ) {
-        Icon(
-            Icons.Filled.Folder,
-            contentDescription = "Folder",
-            modifier = Modifier.size(40.dp),
-            tint = MaterialTheme.colorScheme.secondary
-        )
-        Spacer(modifier = Modifier.width(16.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(item.name, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
-            Text("${item.itemCount} items", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier.size(48.dp).clip(CircleShape).background(Color.White),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(Icons.Filled.Folder, contentDescription = "Folder", tint = Color.Black)
+            }
+            Spacer(modifier = Modifier.width(16.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(item.name, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = Color.Black)
+                Text("${item.itemCount} items", fontSize = 13.sp, color = Color.Black.copy(alpha = 0.6f))
+            }
+        }
+    }
+}
+
+@Composable
+fun FileListItem(item: FileItem, onClick: () -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth().clickable { onClick() },
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White)
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier.size(48.dp).clip(CircleShape).background(Color(0xFFF7F8F8)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(Icons.Filled.Description, contentDescription = "File", tint = Color.Black)
+            }
+            Spacer(modifier = Modifier.width(16.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(item.name, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = Color.Black)
+                Text("PDF • Just now", fontSize = 13.sp, color = Color.Gray)
+            }
         }
     }
 }

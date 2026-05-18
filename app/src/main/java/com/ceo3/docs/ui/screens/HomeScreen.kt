@@ -9,6 +9,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.HelpOutline
@@ -67,6 +68,18 @@ fun HomeScreen(
 ) {
     val state by viewModel.uiState.collectAsState()
     val scrollState = rememberScrollState()
+    val context = androidx.compose.ui.platform.LocalContext.current
+
+    val documentPickerLauncher = rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.OpenDocument(),
+        onResult = { uri ->
+            uri?.let {
+                // In a real app, copy this file to internal storage and save to DB
+                // For now, we mock navigating to editor
+                onNavigateToEditor("imported_doc")
+            }
+        }
+    )
 
     Scaffold(
         containerColor = Color(0xFFF7F8F8)
@@ -131,7 +144,7 @@ fun HomeScreen(
                         subtitle = "Sign, Add text, Add images, Markup, Hide, Recognize...",
                         icon = Icons.Filled.EditSquare,
                         backgroundColor = Color(0xFFFFDF70),
-                        onClick = { /* TODO */ }
+                        onClick = { documentPickerLauncher.launch(arrayOf("application/pdf", "image/*", "text/plain")) }
                     )
                 }
                 Row(
@@ -144,7 +157,7 @@ fun HomeScreen(
                         subtitle = "pdf, jpg, doc, txt, xls, ppt",
                         icon = Icons.Filled.Output,
                         backgroundColor = Color(0xFFBCE3A6),
-                        onClick = { /* TODO */ }
+                        onClick = { documentPickerLauncher.launch(arrayOf("*/*")) }
                     )
                     Spacer(modifier = Modifier.weight(1f))
                 }
