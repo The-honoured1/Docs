@@ -43,6 +43,12 @@ import com.ceo3.docs.ui.screens.SharedScreen
 import com.ceo3.docs.ui.screens.SettingsScreen
 import com.ceo3.docs.ui.screens.ToolsScreen
 import com.ceo3.docs.ui.screens.TemplatesScreen
+import com.ceo3.docs.ui.screens.AccountSettingsScreen
+import com.ceo3.docs.ui.screens.CloudSyncBackupScreen
+import com.ceo3.docs.ui.screens.ThemeSettingsScreen
+import com.ceo3.docs.ui.screens.SecurityPasscodeScreen
+import com.ceo3.docs.ui.screens.HelpSupportScreen
+import com.ceo3.docs.ui.screens.AboutDocsScreen
 import java.net.URLDecoder
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
@@ -62,6 +68,12 @@ sealed class Screen(val route: String) {
     object Donate  : Screen("donate")
     object Tools    : Screen("tools")
     object Templates: Screen("templates")
+    object AccountSettings : Screen("settings/account")
+    object CloudSyncBackup : Screen("settings/cloud")
+    object ThemeSettings   : Screen("settings/theme")
+    object SecurityPasscode: Screen("settings/security")
+    object HelpSupport     : Screen("settings/help")
+    object AboutDocs       : Screen("settings/about")
 }
 
 private data class NavItem(
@@ -210,7 +222,13 @@ fun DocsNavHost(navController: NavHostController, modifier: Modifier = Modifier)
         composable(Screen.Settings.route) {
             SettingsScreen(
                 onNavigateToDonate = { navController.navigate(Screen.Donate.route) },
-                onNavigateToTools  = { navController.navigate(Screen.Tools.route) }
+                onNavigateToTools  = { navController.navigate(Screen.Tools.route) },
+                onNavigateToAccount = { navController.navigate(Screen.AccountSettings.route) },
+                onNavigateToCloudSync = { navController.navigate(Screen.CloudSyncBackup.route) },
+                onNavigateToTheme = { navController.navigate(Screen.ThemeSettings.route) },
+                onNavigateToSecurity = { navController.navigate(Screen.SecurityPasscode.route) },
+                onNavigateToHelp = { navController.navigate(Screen.HelpSupport.route) },
+                onNavigateToAbout = { navController.navigate(Screen.AboutDocs.route) }
             )
         }
         composable(Screen.Editor.route) { backStackEntry ->
@@ -248,6 +266,24 @@ fun DocsNavHost(navController: NavHostController, modifier: Modifier = Modifier)
                 onNavigateToEditor = { docId -> navController.navigate(Screen.Editor.createRoute(docId)) },
                 onNavigateBack     = { navController.popBackStack() }
             )
+        }
+        composable(Screen.AccountSettings.route) {
+            AccountSettingsScreen(onNavigateBack = { navController.popBackStack() })
+        }
+        composable(Screen.CloudSyncBackup.route) {
+            CloudSyncBackupScreen(onNavigateBack = { navController.popBackStack() })
+        }
+        composable(Screen.ThemeSettings.route) {
+            ThemeSettingsScreen(onNavigateBack = { navController.popBackStack() })
+        }
+        composable(Screen.SecurityPasscode.route) {
+            SecurityPasscodeScreen(onNavigateBack = { navController.popBackStack() })
+        }
+        composable(Screen.HelpSupport.route) {
+            HelpSupportScreen(onNavigateBack = { navController.popBackStack() })
+        }
+        composable(Screen.AboutDocs.route) {
+            AboutDocsScreen(onNavigateBack = { navController.popBackStack() })
         }
     }
 }

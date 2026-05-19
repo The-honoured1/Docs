@@ -26,7 +26,13 @@ import com.ceo3.docs.ui.theme.*
 @Composable
 fun SettingsScreen(
     onNavigateToDonate: () -> Unit,
-    onNavigateToTools: () -> Unit
+    onNavigateToTools: () -> Unit,
+    onNavigateToAccount: () -> Unit,
+    onNavigateToCloudSync: () -> Unit,
+    onNavigateToTheme: () -> Unit,
+    onNavigateToSecurity: () -> Unit,
+    onNavigateToHelp: () -> Unit,
+    onNavigateToAbout: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -198,37 +204,43 @@ fun SettingsScreen(
                     SettingsItem(
                         icon = Icons.Filled.AccountCircle,
                         iconColor = Color(0xFF3B82F6),
-                        title = "Account Settings"
+                        title = "Account Settings",
+                        onClick = onNavigateToAccount
                     )
                     HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.08f), modifier = Modifier.padding(horizontal = 16.dp))
                     SettingsItem(
                         icon = Icons.Filled.CloudQueue,
                         iconColor = Color(0xFF10B981),
-                        title = "Cloud Sync & Backup"
+                        title = "Cloud Sync & Backup",
+                        onClick = onNavigateToCloudSync
                     )
                     HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.08f), modifier = Modifier.padding(horizontal = 16.dp))
                     SettingsItem(
                         icon = Icons.Filled.Palette,
                         iconColor = Color(0xFF8B5CF6),
-                        title = "Theme Settings"
+                        title = "Theme Settings",
+                        onClick = onNavigateToTheme
                     )
                     HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.08f), modifier = Modifier.padding(horizontal = 16.dp))
                     SettingsItem(
                         icon = Icons.Filled.Security,
                         iconColor = Color(0xFFF59E0B),
-                        title = "Security & Passcode"
+                        title = "Security & Passcode",
+                        onClick = onNavigateToSecurity
                     )
                     HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.08f), modifier = Modifier.padding(horizontal = 16.dp))
                     SettingsItem(
                         icon = Icons.Filled.HelpOutline,
                         iconColor = Color(0xFF6B7280),
-                        title = "Help & Support"
+                        title = "Help & Support",
+                        onClick = onNavigateToHelp
                     )
                     HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.08f), modifier = Modifier.padding(horizontal = 16.dp))
                     SettingsItem(
                         icon = Icons.Filled.Info,
                         iconColor = Color(0xFF64748B),
-                        title = "About Docs"
+                        title = "About Docs",
+                        onClick = onNavigateToAbout
                     )
                 }
             }
