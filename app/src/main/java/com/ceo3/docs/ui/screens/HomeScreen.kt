@@ -81,34 +81,12 @@ class HomeViewModel(application: android.app.Application) : androidx.lifecycle.A
         viewModelScope.launch(Dispatchers.IO) {
             val now = System.currentTimeMillis()
 
-            // 1. Project Proposal.docx
-            val file1 = File(context.filesDir, "doc_project_proposal.docx")
-            if (!file1.exists()) {
-                file1.writeText("""# Project Proposal
-
-## 1. Introduction
-This proposal outlines the scope, objectives, and implementation plan for our project. Our goal is to deliver a scalable and efficient solution that meets your business needs.
-
-## 2. Objectives
-- Improve operational efficiency
-- Reduce costs by 20%
-- Enhance user experience
-- Ensure scalability and security
-
-## 3. Timeline
-The project will be completed in the following phases:""")
+            // Remove legacy project proposal if it exists
+            dao.deleteDocument("project_proposal")
+            val legacyFile = File(context.filesDir, "doc_project_proposal.docx")
+            if (legacyFile.exists()) {
+                legacyFile.delete()
             }
-            val doc1 = DocumentEntity(
-                id = "project_proposal",
-                title = "Project Proposal",
-                type = "DOCX",
-                lastModified = now,
-                isPinned = true,
-                tags = "Work,Marketing,Important",
-                accentTheme = "classic",
-                accentColor = "blue"
-            )
-            dao.insertDocument(doc1)
 
             // 2. Q2 Financial Report.pdf
             val file2 = File(context.filesDir, "doc_q2_financial_report.pdf")
