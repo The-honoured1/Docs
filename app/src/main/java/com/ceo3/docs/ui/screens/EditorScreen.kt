@@ -251,7 +251,7 @@ fun EditorScreen(
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxWidth()
-                        .padding(horizontal = 24.dp, bottom = 24.dp)
+                        .padding(start = 24.dp, end = 24.dp, bottom = 24.dp)
                         .shadow(8.dp, RoundedCornerShape(24.dp))
                         .clip(RoundedCornerShape(24.dp))
                         .background(currentTheme.paperBg)
@@ -1233,3 +1233,28 @@ val Accents = listOf(
     AccentColorPreset("orange", Color(0xFFFF9800), "Orange"),
     AccentColorPreset("purple", Color(0xFF9C27B0), "Purple")
 )
+
+data class ThemePreset(
+    val name: String,
+    val paperBg: Color,
+    val text: Color,
+    val label: String
+)
+
+data class AccentColorPreset(
+    val name: String,
+    val color: Color,
+    val label: String
+)
+
+data class DrawingStroke(
+    val points: List<androidx.compose.ui.geometry.Offset>,
+    val color: Color,
+    val strokeWidth: Float
+)
+
+enum class ViewMode {
+    TEXT_EDIT,
+    PDF_VIEW,
+    PDF_SIGN
+}
