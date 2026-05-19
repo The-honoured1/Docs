@@ -166,7 +166,11 @@ fun DocsNavHost(navController: NavHostController, modifier: Modifier = Modifier)
         }
         composable(Screen.Editor.route) { backStackEntry ->
             val encodedDocId = backStackEntry.arguments?.getString("docId") ?: ""
-            val docId = URLDecoder.decode(encodedDocId, StandardCharsets.UTF_8.toString())
+            val docId = try {
+                URLDecoder.decode(encodedDocId, StandardCharsets.UTF_8.toString())
+            } catch (e: Exception) {
+                encodedDocId
+            }
             EditorScreen(
                 documentId     = docId,
                 onNavigateBack = { navController.popBackStack() }

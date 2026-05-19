@@ -91,6 +91,9 @@ data class ToolsUiState(
     val completionMessage: String? = null
 )
 
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.toArgb
+
 class ToolsViewModel(application: android.app.Application) : AndroidViewModel(application), TextToSpeech.OnInitListener {
     private val _uiState = MutableStateFlow(ToolsUiState())
     val uiState: StateFlow<ToolsUiState> = _uiState
@@ -99,6 +102,49 @@ class ToolsViewModel(application: android.app.Application) : AndroidViewModel(ap
     private val converter = DocumentConverter(application)
     private val ocrEngine = OcrEngine()
     private var tts: TextToSpeech? = null
+
+    // Real interactive tools state variables
+    val selectedFileText = mutableStateOf("")
+    val selectedFileName = mutableStateOf("")
+    val chatMessages = mutableStateListOf<Pair<String, String>>() // Pair of (Sender, Message)
+
+    // Local spelling dictionary of common typos
+    val spellingDictionary = mapOf(
+        "teh" to "the", "recieve" to "receive", "dont" to "don't", "cant" to "can't",
+        "alwasy" to "always", "implmentation" to "implementation", "experiance" to "experience",
+        "seperate" to "separate", "goverment" to "government", "definitly" to "definitely",
+        "untill" to "until", "beleive" to "believe", "occured" to "occurred",
+        "sucessful" to "successful", "enviroment" to "environment", "truely" to "truly",
+        "oppurtunity" to "opportunity", "tommorrow" to "tomorrow", "unforunately" to "unfortunately"
+    )
+
+    // Local translation dictionaries
+    val translationDictionary = mapOf(
+        "SPANISH" to mapOf(
+            "hello" to "hola", "world" to "mundo", "document" to "documento", "invoice" to "factura",
+            "contract" to "contrato", "report" to "informe", "receipt" to "recibo", "summary" to "resumen",
+            "name" to "nombre", "date" to "fecha", "total" to "total", "amount" to "cantidad",
+            "signature" to "firma", "thank you" to "gracias", "please" to "por favor",
+            "approved" to "aprobado", "pending" to "pendiente", "project" to "proyecto",
+            "the" to "el/la", "is" to "es", "this" to "este/esta", "a" to "un/una", "to" to "a"
+        ),
+        "FRENCH" to mapOf(
+            "hello" to "bonjour", "world" to "monde", "document" to "document", "invoice" to "facture",
+            "contract" to "contrat", "report" to "rapport", "receipt" to "reçu", "summary" to "résumé",
+            "name" to "nom", "date" to "date", "total" to "total", "amount" to "montant",
+            "signature" to "signature", "thank you" to "merci", "please" to "s'il vous plaît",
+            "approved" to "approuvé", "pending" to "en attente", "project" to "projet",
+            "the" to "le/la", "is" to "est", "this" to "ce/cette", "a" to "un/une", "to" to "à"
+        ),
+        "GERMAN" to mapOf(
+            "hello" to "hallo", "world" to "welt", "document" to "dokument", "invoice" to "rechnung",
+            "contract" to "vertrag", "report" to "bericht", "receipt" to "quittung", "summary" to "zusammenfassung",
+            "name" to "name", "date" to "datum", "total" to "gesamt", "amount" to "betrag",
+            "signature" to "unterschrift", "thank you" to "danke", "please" to "bitte",
+            "approved" to "genehmigt", "pending" to "ausstehend", "project" to "projekt",
+            "the" to "der/die/das", "is" to "ist", "this" to "dieses", "a" to "ein/eine", "to" to "zu"
+        )
+    )
 
     init {
         tts = TextToSpeech(application, this)
@@ -122,6 +168,388 @@ class ToolsViewModel(application: android.app.Application) : AndroidViewModel(ap
         super.onCleared()
         tts?.stop()
         tts?.shutdown()
+    }
+
+    fun loadFileContentForTool(uri: Uri, onLoaded: () -> Unit) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val context = getApplication<android.app.Application>()
+                val name = getFileNameFromUri(context, uri) ?: "Document"
+                val ext = name.substringAfterLast(".").uppercase()
+                var content = ""
+
+                if (ext == "PDF") {
+                    val tempFile = File(context.cacheDir, "temp_tool_${System.currentTimeMillis()}.pdf")
+                    context.contentResolver.openInputStream(uri)?.use { input ->
+                        FileOutputStream(tempFile).use { output ->
+                            input.copyTo(output)
+                        }
+                    }
+                    val res = converter.pdfToText(tempFile, ocrEngine)
+                    if (res.isSuccess) {
+                        content = res.getOrThrow()
+                    }
+                } else {
+                    context.contentResolver.openInputStream(uri)?.use { input ->
+                        content = input.bufferedReader().readText()
+                    }
+                }
+
+                withContext(Dispatchers.Main) {
+                    selectedFileName.value = name
+                    selectedFileText.value = content
+                    chatMessages.clear()
+                    chatMessages.add("AI" to "Hello! I've loaded \"$name\". How can I help you analyze it today?")
+                    onLoaded()
+                }
+            } catch (e: Throwable) {
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(getApplication(), "Failed to read file: ${e.message}", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
+
+    fun translateLocalText(text: String, targetLang: String): String {
+        if (text.trim().isEmpty()) return ""
+        val dict = translationDictionary[targetLang.uppercase()] ?: return text
+        val words = text.split(Regex("(?<=\\b)|(?=\\b)"))
+        val builder = StringBuilder()
+        words.forEach { word ->
+            val cleanWord = word.lowercase().trim()
+            val translated = dict[cleanWord]
+            if (translated != null) {
+                // Match original casing roughly
+                if (word.firstOrNull()?.isUpperCase() == true) {
+                    builder.append(translated.replaceFirstChar { it.uppercase() })
+                } else {
+                    builder.append(translated)
+                }
+            } else {
+                builder.append(word)
+            }
+        }
+        return builder.toString()
+    }
+
+    fun checkLocalSpelling(text: String): List<Pair<String, String>> {
+        val mistakes = mutableListOf<Pair<String, String>>()
+        if (text.trim().isEmpty()) return mistakes
+        val words = text.split(Regex("[^a-zA-Z]")).filter { it.length > 2 }
+        words.forEach { word ->
+            val clean = word.lowercase()
+            val correction = spellingDictionary[clean]
+            if (correction != null) {
+                mistakes.add(word to correction)
+            }
+        }
+        return mistakes.distinctBy { it.first }
+    }
+
+    fun summarizeText(text: String): String {
+        if (text.trim().isEmpty()) return "Document is empty."
+        val sentences = text.split(Regex("(?<=[.!?])\\s+")).filter { it.trim().isNotEmpty() }
+        if (sentences.size <= 3) return sentences.joinToString("\n\n")
+
+        val stopWords = setOf("the", "a", "an", "is", "are", "and", "or", "but", "in", "on", "at", "to", "for", "of", "with", "by", "this", "that", "it", "he", "she", "they", "we", "i", "you")
+        val wordCounts = mutableMapOf<String, Int>()
+        sentences.forEach { sentence ->
+            sentence.lowercase()
+                .split(Regex("[^a-zA-Z]"))
+                .filter { it.length > 2 && it !in stopWords }
+                .forEach { word ->
+                    wordCounts[word] = (wordCounts[word] ?: 0) + 1
+                }
+        }
+
+        val scoredSentences = sentences.map { sentence ->
+            val words = sentence.lowercase().split(Regex("[^a-zA-Z]")).filter { it.isNotEmpty() }
+            val score = words.sumOf { wordCounts[it] ?: 0 }
+            val normalizedScore = if (words.isNotEmpty()) score.toFloat() / words.size else 0f
+            sentence to normalizedScore
+        }
+
+        val topSentences = scoredSentences.sortedByDescending { it.second }.take(3).map { it.first.trim() }
+        return "• " + topSentences.joinToString("\n\n• ")
+    }
+
+    fun askChatPdf(question: String) {
+        if (question.trim().isEmpty()) return
+        chatMessages.add("User" to question)
+        val docText = selectedFileText.value
+        if (docText.trim().isEmpty()) {
+            chatMessages.add("AI" to "The document appears to be empty, so I can't search for answers.")
+            return
+        }
+
+        viewModelScope.launch(Dispatchers.Default) {
+            val sentences = docText.split(Regex("(?<=[.!?])\\s+")).filter { it.trim().isNotEmpty() }
+            val queryWords = question.lowercase().split(Regex("[^a-zA-Z]")).filter { it.length > 2 }
+            
+            if (queryWords.isEmpty()) {
+                withContext(Dispatchers.Main) {
+                    chatMessages.add("AI" to "Please ask a more specific question with more words.")
+                }
+                return@launch
+            }
+
+            var bestSentence = ""
+            var bestScore = 0f
+
+            sentences.forEach { sentence ->
+                val sentenceWords = sentence.lowercase().split(Regex("[^a-zA-Z]")).filter { it.isNotEmpty() }.toSet()
+                val intersection = queryWords.filter { it in sentenceWords }.size
+                val score = intersection.toFloat() / (queryWords.size + sentenceWords.size - intersection) // Jaccard Similarity
+                if (score > bestScore) {
+                    bestScore = score
+                    bestSentence = sentence
+                }
+            }
+
+            val reply = if (bestScore > 0.04f) {
+                "Based on the document context, I found this relevant passage:\n\n\"${bestSentence.trim()}\""
+            } else {
+                "I couldn't find a direct reference to that in the document. Here is the beginning context:\n\n\"${sentences.take(2).joinToString(" ").trim()}...\""
+            }
+
+            withContext(Dispatchers.Main) {
+                chatMessages.add("AI" to reply)
+            }
+        }
+    }
+
+    fun processBgRemoval(uri: Uri, onComplete: (String) -> Unit) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                withContext(Dispatchers.Main) {
+                    _uiState.value = _uiState.value.copy(
+                        isProcessing = true,
+                        processingMessage = "Analyzing scan contrast & alpha mapping...",
+                        processProgress = 0.3f
+                    )
+                }
+                val context = getApplication<android.app.Application>()
+                val bitmap = context.contentResolver.openInputStream(uri)?.use { stream ->
+                    BitmapFactory.decodeStream(stream)
+                } ?: throw Exception("Failed to decode image")
+
+                val width = bitmap.width
+                val height = bitmap.height
+                val transparentBmp = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+
+                val pixels = IntArray(width * height)
+                bitmap.getPixels(pixels, 0, width, 0, 0, width, height)
+
+                // Fast scan pixel keys
+                for (i in pixels.indices) {
+                    val color = pixels[i]
+                    val r = (color shr 16) and 0xff
+                    val g = (color shr 8) and 0xff
+                    val b = color and 0xff
+                    if (r > 200 && g > 200 && b > 200) {
+                        pixels[i] = 0x00000000 // Fully transparent
+                    }
+                }
+                transparentBmp.setPixels(pixels, 0, width, 0, 0, width, height)
+
+                val docId = UUID.randomUUID().toString()
+                val pngFile = File(context.filesDir, "doc_${docId}.png")
+                FileOutputStream(pngFile).use { out ->
+                    transparentBmp.compress(Bitmap.CompressFormat.PNG, 100, out)
+                }
+
+                val entity = DocumentEntity(
+                    id = docId,
+                    title = "BgRemoved_${System.currentTimeMillis() / 100000}",
+                    type = "PNG",
+                    lastModified = System.currentTimeMillis(),
+                    isPinned = false,
+                    tags = "BgRemoved"
+                )
+                dao.insertDocument(entity)
+
+                withContext(Dispatchers.Main) {
+                    _uiState.value = _uiState.value.copy(isProcessing = false)
+                    onComplete(docId)
+                }
+            } catch (e: Throwable) {
+                withContext(Dispatchers.Main) {
+                    _uiState.value = _uiState.value.copy(isProcessing = false)
+                    Toast.makeText(getApplication(), "BG removal failed: ${e.message}", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
+
+    fun processImageToExcel(uri: Uri, onComplete: (String) -> Unit) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                withContext(Dispatchers.Main) {
+                    _uiState.value = _uiState.value.copy(
+                        isProcessing = true,
+                        processingMessage = "Extracting spreadsheet layout and fields...",
+                        processProgress = 0.4f
+                    )
+                }
+                val context = getApplication<android.app.Application>()
+                val bitmap = context.contentResolver.openInputStream(uri)?.use { stream ->
+                    BitmapFactory.decodeStream(stream)
+                } ?: throw Exception("Failed to decode image")
+
+                val ocrResult = ocrEngine.extractTextFromImage(bitmap)
+                if (ocrResult.isSuccess) {
+                    val text = ocrResult.getOrThrow()
+                    val lines = text.split("\n")
+                    val csvBuilder = StringBuilder()
+
+                    lines.forEach { line ->
+                        val cols = line.split(Regex("\\s{2,}")).map { "\"${it.replace("\"", "\"\"")}\"" }
+                        csvBuilder.append(cols.joinToString(",")).append("\n")
+                    }
+
+                    val docId = UUID.randomUUID().toString()
+                    val csvFile = File(context.filesDir, "doc_${docId}.csv")
+                    csvFile.writeText(csvBuilder.toString())
+
+                    val entity = DocumentEntity(
+                        id = docId,
+                        title = "Spreadsheet_${System.currentTimeMillis() / 100000}",
+                        type = "CSV",
+                        lastModified = System.currentTimeMillis(),
+                        isPinned = false,
+                        tags = "Spreadsheet,Excel"
+                    )
+                    dao.insertDocument(entity)
+
+                    withContext(Dispatchers.Main) {
+                        _uiState.value = _uiState.value.copy(isProcessing = false)
+                        onComplete(docId)
+                    }
+                } else {
+                    throw ocrResult.exceptionOrNull() ?: Exception("Failed to recognize table text")
+                }
+            } catch (e: Throwable) {
+                withContext(Dispatchers.Main) {
+                    _uiState.value = _uiState.value.copy(isProcessing = false)
+                    Toast.makeText(getApplication(), "Failed to build Excel spreadsheet: ${e.message}", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
+
+    fun processImageToPpt(uri: Uri, onComplete: (String) -> Unit) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                withContext(Dispatchers.Main) {
+                    _uiState.value = _uiState.value.copy(
+                        isProcessing = true,
+                        processingMessage = "Synthesizing PowerPoint slide decks...",
+                        processProgress = 0.5f
+                    )
+                }
+                val context = getApplication<android.app.Application>()
+                val bitmap = context.contentResolver.openInputStream(uri)?.use { stream ->
+                    BitmapFactory.decodeStream(stream)
+                } ?: throw Exception("Failed to decode image")
+
+                val ocrResult = ocrEngine.extractTextFromImage(bitmap)
+                if (ocrResult.isSuccess) {
+                    val text = ocrResult.getOrThrow()
+                    val pptContent = "SLIDE 1\nTitle: OCR PowerPoint Conversion\n\nSLIDE 2\nKey Slide Contents:\n$text"
+
+                    val docId = UUID.randomUUID().toString()
+                    val pptFile = File(context.filesDir, "doc_${docId}.txt")
+                    pptFile.writeText(pptContent)
+
+                    val entity = DocumentEntity(
+                        id = docId,
+                        title = "Slides_${System.currentTimeMillis() / 100000}",
+                        type = "TXT",
+                        lastModified = System.currentTimeMillis(),
+                        isPinned = false,
+                        tags = "PowerPoint,Slides"
+                    )
+                    dao.insertDocument(entity)
+
+                    withContext(Dispatchers.Main) {
+                        _uiState.value = _uiState.value.copy(isProcessing = false)
+                        onComplete(docId)
+                    }
+                } else {
+                    throw ocrResult.exceptionOrNull() ?: Exception("OCR recognition failed")
+                }
+            } catch (e: Throwable) {
+                withContext(Dispatchers.Main) {
+                    _uiState.value = _uiState.value.copy(isProcessing = false)
+                    Toast.makeText(getApplication(), "Slides compilation failed: ${e.message}", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
+
+    fun saveErasedImage(uri: Uri, erasedStrokes: List<List<Offset>>, brushWidth: Float, onComplete: (String) -> Unit) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                withContext(Dispatchers.Main) {
+                    _uiState.value = _uiState.value.copy(
+                        isProcessing = true,
+                        processingMessage = "Applying smart white patches to selection...",
+                        processProgress = 0.5f
+                    )
+                }
+                val context = getApplication<android.app.Application>()
+                val bitmap = context.contentResolver.openInputStream(uri)?.use { stream ->
+                    BitmapFactory.decodeStream(stream)
+                } ?: throw Exception("Failed to decode image")
+
+                val mutableBmp = bitmap.copy(Bitmap.Config.ARGB_8888, true)
+                val canvas = Canvas(mutableBmp)
+                val paint = Paint().apply {
+                    color = android.graphics.Color.WHITE
+                    style = Paint.Style.STROKE
+                    strokeCap = Paint.Cap.ROUND
+                    strokeJoin = Paint.Join.ROUND
+                    strokeWidth = brushWidth
+                }
+
+                erasedStrokes.forEach { stroke ->
+                    if (stroke.size > 1) {
+                        val path = android.graphics.Path()
+                        path.moveTo(stroke[0].x, stroke[0].y)
+                        for (i in 1 until stroke.size) {
+                            path.lineTo(stroke[i].x, stroke[i].y)
+                        }
+                        canvas.drawPath(path, paint)
+                    }
+                }
+
+                val docId = UUID.randomUUID().toString()
+                val erasedFile = File(context.filesDir, "doc_${docId}.jpg")
+                FileOutputStream(erasedFile).use { out ->
+                    mutableBmp.compress(Bitmap.CompressFormat.JPEG, 90, out)
+                }
+
+                val entity = DocumentEntity(
+                    id = docId,
+                    title = "Erased_${System.currentTimeMillis() / 100000}",
+                    type = "JPG",
+                    lastModified = System.currentTimeMillis(),
+                    isPinned = false,
+                    tags = "Erased"
+                )
+                dao.insertDocument(entity)
+
+                withContext(Dispatchers.Main) {
+                    _uiState.value = _uiState.value.copy(isProcessing = false)
+                    onComplete(docId)
+                }
+            } catch (e: Throwable) {
+                withContext(Dispatchers.Main) {
+                    _uiState.value = _uiState.value.copy(isProcessing = false)
+                    Toast.makeText(getApplication(), "Eraser sweep failed: ${e.message}", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
     }
 
     fun setSelectedTab(tab: String) {

@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Paint
+import android.graphics.Path
 import android.graphics.RectF
 import android.graphics.pdf.PdfRenderer
 import android.net.Uri
@@ -39,6 +40,10 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.foundation.Canvas as ComposeCanvas
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.AndroidViewModel
@@ -195,7 +200,7 @@ class EditorViewModel(application: android.app.Application) : AndroidViewModel(a
                         }
                     }
                 }
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 withContext(Dispatchers.Main) {
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
@@ -236,7 +241,7 @@ class EditorViewModel(application: android.app.Application) : AndroidViewModel(a
             for (i in 0 until renderer.pageCount) {
                 val page = renderer.openPage(i)
                 // Scale rendering for display quality
-                val scale = 2f
+                val scale = 1.5f
                 val width = (page.width * scale).toInt()
                 val height = (page.height * scale).toInt()
                 val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
@@ -246,7 +251,7 @@ class EditorViewModel(application: android.app.Application) : AndroidViewModel(a
                 bitmaps.add(bitmap)
                 page.close()
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             e.printStackTrace()
         } finally {
             renderer?.close()
@@ -347,7 +352,7 @@ class EditorViewModel(application: android.app.Application) : AndroidViewModel(a
                     _uiState.value = _uiState.value.copy(isSaving = false)
                     onComplete()
                 }
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 withContext(Dispatchers.Main) {
                     _uiState.value = _uiState.value.copy(isSaving = false, error = "Failed to save annotated document: ${e.message}")
                 }
