@@ -391,7 +391,7 @@ fun EditorScreen(
                 title = { Text(state.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled., contentDescription = "Back")
+                    //    Icon(Icons.AutoMirrored.Filled.Arrow, contentDescription = "Back")
                     }
                 },
                 actions = {

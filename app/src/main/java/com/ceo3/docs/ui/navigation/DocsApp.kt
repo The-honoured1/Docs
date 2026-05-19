@@ -1,6 +1,8 @@
 package com.ceo3.docs.ui.navigation
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
@@ -158,17 +160,17 @@ fun PillNavItem(
 ) {
     val bgColor by animateColorAsState(
         targetValue = if (selected) BrandAccent else Color.Transparent,
-        animationSpec = tween(durationMillis = 250),
+        animationSpec = tween(durationMillis = 120),
         label = "navBg"
     )
     val contentColor by animateColorAsState(
         targetValue = if (selected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
-        animationSpec = tween(durationMillis = 250),
+        animationSpec = tween(durationMillis = 120),
         label = "navContent"
     )
     val itemWidth by animateDpAsState(
         targetValue = if (selected) 110.dp else 56.dp,
-        animationSpec = spring(dampingRatio = 0.7f, stiffness = 400f),
+        animationSpec = spring(dampingRatio = 0.8f, stiffness = 1200f),
         label = "navWidth"
     )
 
@@ -213,7 +215,11 @@ fun DocsNavHost(navController: NavHostController, modifier: Modifier = Modifier)
     NavHost(
         navController = navController,
         startDestination = Screen.Home.route,
-        modifier = modifier
+        modifier = modifier,
+        enterTransition = { fadeIn(animationSpec = tween(120)) },
+        exitTransition = { fadeOut(animationSpec = tween(120)) },
+        popEnterTransition = { fadeIn(animationSpec = tween(120)) },
+        popExitTransition = { fadeOut(animationSpec = tween(120)) }
     ) {
         composable(Screen.Home.route) {
             HomeScreen(
