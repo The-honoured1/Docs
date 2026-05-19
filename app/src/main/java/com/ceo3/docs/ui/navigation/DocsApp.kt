@@ -41,6 +41,8 @@ import com.ceo3.docs.ui.screens.HomeScreen
 import com.ceo3.docs.ui.screens.ScannerScreen
 import com.ceo3.docs.ui.screens.SharedScreen
 import com.ceo3.docs.ui.screens.SettingsScreen
+import com.ceo3.docs.ui.screens.ToolsScreen
+import com.ceo3.docs.ui.screens.TemplatesScreen
 import java.net.URLDecoder
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
@@ -58,6 +60,8 @@ sealed class Screen(val route: String) {
     }
     object Scanner : Screen("scanner")
     object Donate  : Screen("donate")
+    object Tools    : Screen("tools")
+    object Templates: Screen("templates")
 }
 
 private data class NavItem(
@@ -155,8 +159,8 @@ fun DocsApp() {
             // Mockup Floating Action Button (+) floating above bottom navigation on the right side
             FloatingActionButton(
                 onClick = {
-                    // Quick Action: Create a Blank Document
-                    navController.navigate(Screen.Editor.createRoute("new_blank_document"))
+                    // Navigate to Template Library / Create Doc screen
+                    navController.navigate(Screen.Templates.route)
                 },
                 shape = CircleShape,
                 containerColor = MaterialTheme.colorScheme.primary,
@@ -186,9 +190,11 @@ fun DocsNavHost(navController: NavHostController, modifier: Modifier = Modifier)
     ) {
         composable(Screen.Home.route) {
             HomeScreen(
-                onNavigateToEditor  = { docId -> navController.navigate(Screen.Editor.createRoute(docId)) },
-                onNavigateToScanner = { navController.navigate(Screen.Scanner.route) },
-                onNavigateToDonate  = { navController.navigate(Screen.Donate.route) }
+                onNavigateToEditor    = { docId -> navController.navigate(Screen.Editor.createRoute(docId)) },
+                onNavigateToScanner   = { navController.navigate(Screen.Scanner.route) },
+                onNavigateToDonate    = { navController.navigate(Screen.Donate.route) },
+                onNavigateToTemplates = { navController.navigate(Screen.Templates.route) },
+                onNavigateToTools     = { navController.navigate(Screen.Tools.route) }
             )
         }
         composable(Screen.Files.route) {
@@ -202,7 +208,10 @@ fun DocsNavHost(navController: NavHostController, modifier: Modifier = Modifier)
             )
         }
         composable(Screen.Settings.route) {
-            SettingsScreen()
+            SettingsScreen(
+                onNavigateToDonate = { navController.navigate(Screen.Donate.route) },
+                onNavigateToTools  = { navController.navigate(Screen.Tools.route) }
+            )
         }
         composable(Screen.Editor.route) { backStackEntry ->
             val encodedDocId = backStackEntry.arguments?.getString("docId") ?: ""
@@ -225,6 +234,19 @@ fun DocsNavHost(navController: NavHostController, modifier: Modifier = Modifier)
         composable(Screen.Donate.route) {
             DonateScreen(
                 onNavigateBack = { navController.popBackStack() }
+            )
+        }
+        composable(Screen.Tools.route) {
+            ToolsScreen(
+                onNavigateToScanner = { navController.navigate(Screen.Scanner.route) },
+                onNavigateToEditor  = { docId -> navController.navigate(Screen.Editor.createRoute(docId)) },
+                onNavigateToDonate  = { navController.navigate(Screen.Donate.route) }
+            )
+        }
+        composable(Screen.Templates.route) {
+            TemplatesScreen(
+                onNavigateToEditor = { docId -> navController.navigate(Screen.Editor.createRoute(docId)) },
+                onNavigateBack     = { navController.popBackStack() }
             )
         }
     }

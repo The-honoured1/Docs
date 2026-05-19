@@ -24,7 +24,10 @@ import com.ceo3.docs.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen() {
+fun SettingsScreen(
+    onNavigateToDonate: () -> Unit,
+    onNavigateToTools: () -> Unit
+) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -101,7 +104,7 @@ fun SettingsScreen() {
                 }
             }
 
-            // --- Premium Card ---
+            // --- Donation Card ---
             item {
                 Box(
                     modifier = Modifier
@@ -109,7 +112,7 @@ fun SettingsScreen() {
                         .clip(RoundedCornerShape(20.dp))
                         .background(
                             Brush.linearGradient(
-                                colors = listOf(Color(0xFF4F46E5), Color(0xFF7C3AED))
+                                colors = listOf(Color(0xFF7C3AED), Color(0xFF2563EB))
                             )
                         )
                         .padding(18.dp)
@@ -121,7 +124,7 @@ fun SettingsScreen() {
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Text(
-                                text = "Docs Premium",
+                                text = "Support Docs",
                                 fontSize = 16.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = Color.White
@@ -133,7 +136,7 @@ fun SettingsScreen() {
                                     .padding(horizontal = 8.dp, vertical = 2.dp)
                             ) {
                                 Text(
-                                    text = "PRO",
+                                    text = "DONATE",
                                     fontSize = 9.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = Color.White
@@ -142,21 +145,21 @@ fun SettingsScreen() {
                         }
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = "Unlock advanced PDF tools, unlimited OCR scanning, and cloud backup integration.",
+                            text = "Docs is 100% free with no ads or paywalls. Help us maintain the servers and develop new features with a small donation.",
                             fontSize = 11.sp,
                             color = Color.White.copy(alpha = 0.8f),
                             lineHeight = 15.sp
                         )
                         Spacer(modifier = Modifier.height(14.dp))
                         Button(
-                            onClick = { /* Upgrade action */ },
+                            onClick = onNavigateToDonate,
                             colors = ButtonDefaults.buttonColors(containerColor = Color.White),
                             shape = RoundedCornerShape(10.dp),
                             contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)
                         ) {
                             Text(
-                                text = "Upgrade Now",
-                                color = Color(0xFF4F46E5),
+                                text = "Support Development",
+                                color = Color(0xFF7C3AED),
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold
                             )
@@ -179,6 +182,20 @@ fun SettingsScreen() {
                         )
                 ) {
                     SettingsItem(
+                        icon = Icons.Filled.Build,
+                        iconColor = Color(0xFFEC4899),
+                        title = "PDF & AI Tools",
+                        onClick = onNavigateToTools
+                    )
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.08f), modifier = Modifier.padding(horizontal = 16.dp))
+                    SettingsItem(
+                        icon = Icons.Filled.Favorite,
+                        iconColor = Color(0xFFEF4444),
+                        title = "Donate & Support",
+                        onClick = onNavigateToDonate
+                    )
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.08f), modifier = Modifier.padding(horizontal = 16.dp))
+                    SettingsItem(
                         icon = Icons.Filled.AccountCircle,
                         iconColor = Color(0xFF3B82F6),
                         title = "Account Settings"
@@ -192,7 +209,7 @@ fun SettingsScreen() {
                     HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.08f), modifier = Modifier.padding(horizontal = 16.dp))
                     SettingsItem(
                         icon = Icons.Filled.Palette,
-                        iconColor = Color(0xFFEC4899),
+                        iconColor = Color(0xFF8B5CF6),
                         title = "Theme Settings"
                     )
                     HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.08f), modifier = Modifier.padding(horizontal = 16.dp))
@@ -204,13 +221,13 @@ fun SettingsScreen() {
                     HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.08f), modifier = Modifier.padding(horizontal = 16.dp))
                     SettingsItem(
                         icon = Icons.Filled.HelpOutline,
-                        iconColor = Color(0xFF8B5CF6),
+                        iconColor = Color(0xFF6B7280),
                         title = "Help & Support"
                     )
                     HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.08f), modifier = Modifier.padding(horizontal = 16.dp))
                     SettingsItem(
                         icon = Icons.Filled.Info,
-                        iconColor = Color(0xFF6B7280),
+                        iconColor = Color(0xFF64748B),
                         title = "About Docs"
                     )
                 }
@@ -223,12 +240,13 @@ fun SettingsScreen() {
 fun SettingsItem(
     icon: ImageVector,
     iconColor: Color,
-    title: String
+    title: String,
+    onClick: () -> Unit = {}
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { /* Handle click */ }
+            .clickable(onClick = onClick)
             .padding(vertical = 14.dp, horizontal = 16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {

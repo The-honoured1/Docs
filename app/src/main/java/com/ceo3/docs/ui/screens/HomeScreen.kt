@@ -254,6 +254,8 @@ fun HomeScreen(
     onNavigateToEditor: (String) -> Unit,
     onNavigateToScanner: () -> Unit,
     onNavigateToDonate: () -> Unit,
+    onNavigateToTemplates: () -> Unit,
+    onNavigateToTools: () -> Unit,
     viewModel: HomeViewModel = viewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -512,16 +514,12 @@ fun HomeScreen(
                         ) {
                             QuickActionCard(
                                 title = "New Doc",
-                                description = "Create a blank document",
+                                description = "Blank doc or templates",
                                 icon = Icons.Filled.Add,
                                 iconBg = Color(0xFFE8F0FE),
                                 iconTint = Color(0xFF1A73E8),
                                 modifier = Modifier.weight(1f),
-                                onClick = {
-                                    viewModel.createBlankDocument { newId ->
-                                        onNavigateToEditor(newId)
-                                    }
-                                }
+                                onClick = onNavigateToTemplates
                             )
                             QuickActionCard(
                                 title = "Scan to Text",
@@ -544,7 +542,7 @@ fun HomeScreen(
                                 iconBg = Color(0xFFFCE8E6),
                                 iconTint = Color(0xFFC5221F),
                                 modifier = Modifier.weight(1f),
-                                onClick = { showPdfToolsSheet = true }
+                                onClick = onNavigateToTools
                             )
                             QuickActionCard(
                                 title = "Import File",
