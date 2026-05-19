@@ -1,19 +1,38 @@
 package com.ceo3.docs.ui.navigation
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DocumentScanner
 import androidx.compose.material.icons.filled.Folder
-import androidx.compose.material.icons.filled.GridOn
+import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.outlined.Folder
-import androidx.compose.material.icons.outlined.GridOn
+import androidx.compose.material.icons.outlined.FolderOpen
+import androidx.compose.material.icons.outlined.GridView
 import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.QrCodeScanner
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -25,6 +44,7 @@ import com.ceo3.docs.ui.screens.FilesScreen
 import com.ceo3.docs.ui.screens.HomeScreen
 import com.ceo3.docs.ui.screens.ScannerScreen
 import com.ceo3.docs.ui.screens.ToolsScreen
+import com.ceo3.docs.ui.theme.BrandAccent
 import java.net.URLDecoder
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
@@ -43,98 +63,148 @@ sealed class Screen(val route: String) {
     object Donate  : Screen("donate")
 }
 
+private data class NavItem(
+    val route: String,
+    val label: String,
+    val selectedIcon: ImageVector,
+    val unselectedIcon: ImageVector
+)
+
+private val navItems = listOf(
+    NavItem(Screen.Home.route,    "Home",    Icons.Filled.Home,            Icons.Outlined.Home),
+    NavItem(Screen.Tools.route,   "Tools",   Icons.Filled.GridView,        Icons.Outlined.GridView),
+    NavItem(Screen.Scanner.route, "Scan",    Icons.Filled.DocumentScanner, Icons.Outlined.QrCodeScanner),
+    NavItem(Screen.Files.route,   "Files",   Icons.Filled.Folder,          Icons.Outlined.FolderOpen)
+)
+
 @Composable
 fun DocsApp() {
     val navController = rememberNavController()
 
-    Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
-        bottomBar = {
-            val navBackStackEntry by navController.currentBackStackEntryAsState()
-            val currentRoute = navBackStackEntry?.destination?.route
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+    ) {
+        val navBackStackEntry by navController.currentBackStackEntryAsState()
+        val currentRoute = navBackStackEntry?.destination?.route
 
-            val showBottomBar = currentRoute in listOf(
-                Screen.Home.route, Screen.Tools.route, Screen.Files.route, Screen.Scanner.route
+        val showBottomBar = currentRoute in navItems.map { it.route }
+
+        DocsNavHost(
+            navController = navController,
+            modifier = Modifier.fillMaxSize()
+        )
+
+        if (showBottomBar) {
+            PillNavigationBar(
+                currentRoute = currentRoute,
+                navController = navController,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 20.dp, start = 24.dp, end = 24.dp)
             )
+        }
+    }
+}
 
-            if (showBottomBar) {
-                NavigationBar(
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    tonalElevation = 8.dp
-                ) {
-                    NavigationBarItem(
-                        selected = currentRoute == Screen.Home.route,
-                        onClick = {
-                            navController.navigate(Screen.Home.route) {
+@Composable
+fun PillNavigationBar(
+    currentRoute: String?,
+    navController: NavHostController,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .shadow(
+                elevation = 24.dp,
+                shape = RoundedCornerShape(50),
+                ambientColor = BrandAccent.copy(alpha = 0.25f),
+                spotColor = BrandAccent.copy(alpha = 0.3f)
+            )
+            .clip(RoundedCornerShape(50))
+            .background(MaterialTheme.colorScheme.surface)
+            .padding(horizontal = 8.dp, vertical = 8.dp)
+    ) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            navItems.forEach { item ->
+                val selected = currentRoute == item.route
+                PillNavItem(
+                    item = item,
+                    selected = selected,
+                    onClick = {
+                        if (!selected) {
+                            navController.navigate(item.route) {
                                 popUpTo(navController.graph.startDestinationId) { saveState = true }
                                 launchSingleTop = true
                                 restoreState = true
                             }
-                        },
-                        icon = {
-                            Icon(
-                                imageVector = if (currentRoute == Screen.Home.route) Icons.Filled.Home else Icons.Outlined.Home,
-                                contentDescription = "Home"
-                            )
-                        },
-                        label = { Text("Home") }
-                    )
-                    NavigationBarItem(
-                        selected = currentRoute == Screen.Tools.route,
-                        onClick = {
-                            navController.navigate(Screen.Tools.route) {
-                                popUpTo(navController.graph.startDestinationId) { saveState = true }
-                                launchSingleTop = true
-                                restoreState = true
-                            }
-                        },
-                        icon = {
-                            Icon(
-                                imageVector = if (currentRoute == Screen.Tools.route) Icons.Filled.GridOn else Icons.Outlined.GridOn,
-                                contentDescription = "Tools"
-                            )
-                        },
-                        label = { Text("Tools") }
-                    )
-                    NavigationBarItem(
-                        selected = currentRoute == Screen.Scanner.route,
-                        onClick = {
-                            navController.navigate(Screen.Scanner.route) {
-                                popUpTo(navController.graph.startDestinationId) { saveState = true }
-                                launchSingleTop = true
-                                restoreState = true
-                            }
-                        },
-                        icon = {
-                            Icon(
-                                imageVector = Icons.Filled.DocumentScanner,
-                                contentDescription = "Scan"
-                            )
-                        },
-                        label = { Text("Scan") }
-                    )
-                    NavigationBarItem(
-                        selected = currentRoute == Screen.Files.route,
-                        onClick = {
-                            navController.navigate(Screen.Files.route) {
-                                popUpTo(navController.graph.startDestinationId) { saveState = true }
-                                launchSingleTop = true
-                                restoreState = true
-                            }
-                        },
-                        icon = {
-                            Icon(
-                                imageVector = if (currentRoute == Screen.Files.route) Icons.Filled.Folder else Icons.Outlined.Folder,
-                                contentDescription = "Files"
-                            )
-                        },
-                        label = { Text("Files") }
-                    )
-                }
+                        }
+                    }
+                )
             }
         }
-    ) { innerPadding ->
-        DocsNavHost(navController = navController, modifier = Modifier.padding(innerPadding))
+    }
+}
+
+@Composable
+fun PillNavItem(
+    item: NavItem,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    val bgColor by animateColorAsState(
+        targetValue = if (selected) BrandAccent else Color.Transparent,
+        animationSpec = tween(durationMillis = 250),
+        label = "navBg"
+    )
+    val contentColor by animateColorAsState(
+        targetValue = if (selected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+        animationSpec = tween(durationMillis = 250),
+        label = "navContent"
+    )
+    val itemWidth by animateDpAsState(
+        targetValue = if (selected) 110.dp else 56.dp,
+        animationSpec = spring(dampingRatio = 0.7f, stiffness = 400f),
+        label = "navWidth"
+    )
+
+    Box(
+        modifier = Modifier
+            .width(itemWidth)
+            .height(44.dp)
+            .clip(CircleShape)
+            .background(bgColor)
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onClick
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = if (selected) item.selectedIcon else item.unselectedIcon,
+                contentDescription = item.label,
+                tint = contentColor,
+                modifier = Modifier.size(20.dp)
+            )
+            if (selected) {
+                Text(
+                    text = item.label,
+                    color = contentColor,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1
+                )
+            }
+        }
     }
 }
 
@@ -189,4 +259,3 @@ fun DocsNavHost(navController: NavHostController, modifier: Modifier = Modifier)
         }
     }
 }
-
