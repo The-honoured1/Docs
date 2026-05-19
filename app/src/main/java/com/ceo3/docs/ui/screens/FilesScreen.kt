@@ -1,5 +1,12 @@
 package com.ceo3.docs.ui.screens
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import android.os.Environment
+import android.util.Log
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -17,10 +24,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.ceo3.docs.data.local.DocumentEntity
@@ -28,6 +37,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -43,16 +53,91 @@ class FilesViewModel(application: android.app.Application) : androidx.lifecycle.
     val uiState: StateFlow<FilesUiState> = _uiState
 
     init {
-        viewModelScope.launch {
-            dao.getAllDocuments().collectLatest { list ->
-                _uiState.value = FilesUiState(documents = list)
+        refreshExternalDocuments()
+    }
+
+    fun refreshExternalDocuments() {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            dao.getAllDocuments().collectLatest { dbList ->
+                val deviceList = scanDeviceDocuments(getApplication())
+                val combined = (dbList + deviceList).sortedByDescending { it.lastModified }
+                _uiState.value = FilesUiState(documents = combined)
             }
         }
     }
 
+    private fun scanDeviceDocuments(context: android.content.Context): List<DocumentEntity> {
+        val list = mutableListOf<DocumentEntity>()
+        val extensions = listOf("pdf", "docx", "doc", "txt")
+        val scanDirs = mutableListOf<File>()
+
+        try {
+            val downloads = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+            if (downloads != null && downloads.exists()) {
+                scanDirs.add(downloads)
+            }
+        } catch (e: Exception) {}
+
+        try {
+            val docs = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS)
+            if (docs != null && docs.exists()) {
+                scanDirs.add(docs)
+            }
+        } catch (e: Exception) {}
+
+        // Add standard fallback directories to be exceptionally thorough
+        val fallbackDownloads = File("/storage/emulated/0/Download")
+        if (fallbackDownloads.exists() && !scanDirs.contains(fallbackDownloads)) {
+            scanDirs.add(fallbackDownloads)
+        }
+        val fallbackDocs = File("/storage/emulated/0/Documents")
+        if (fallbackDocs.exists() && !scanDirs.contains(fallbackDocs)) {
+            scanDirs.add(fallbackDocs)
+        }
+
+        for (dir in scanDirs) {
+            try {
+                val files = dir.listFiles()
+                if (files != null) {
+                    for (file in files) {
+                        if (file.isFile && file.extension.lowercase() in extensions) {
+                            list.add(
+                                DocumentEntity(
+                                    id = file.absolutePath, // Absolute path serves as unique ID
+                                    title = file.nameWithoutExtension,
+                                    type = file.extension.uppercase(),
+                                    lastModified = file.lastModified(),
+                                    isPinned = false,
+                                    tags = "External,${dir.name}",
+                                    accentTheme = "classic",
+                                    accentColor = "blue"
+                                )
+                            )
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("FilesViewModel", "Failed to scan folder ${dir.absolutePath}", e)
+            }
+        }
+        return list
+    }
+
     fun deleteDocument(id: String) {
-        viewModelScope.launch {
-            dao.deleteDocument(id)
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            if (id.startsWith("/")) {
+                try {
+                    val file = File(id)
+                    if (file.exists()) {
+                        file.delete()
+                    }
+                } catch (e: Exception) {
+                    Log.e("FilesViewModel", "Failed to delete external file $id", e)
+                }
+                refreshExternalDocuments()
+            } else {
+                dao.deleteDocument(id)
+            }
         }
     }
 }
@@ -64,7 +149,32 @@ fun FilesScreen(
     viewModel: FilesViewModel = viewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
     var docToDelete by remember { mutableStateOf<DocumentEntity?>(null) }
+
+    var hasStoragePermission by remember {
+        mutableStateOf(
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                ContextCompat.checkSelfPermission(context, Manifest.permission.READ_MEDIA_IMAGES) ==
+                        PackageManager.PERMISSION_GRANTED
+            } else {
+                ContextCompat.checkSelfPermission(context, Manifest.permission.READ_EXTERNAL_STORAGE) ==
+                        PackageManager.PERMISSION_GRANTED
+            }
+        )
+    }
+
+    val storagePermLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        hasStoragePermission = granted
+        viewModel.refreshExternalDocuments()
+    }
+
+    // Proactively scan on resume or permission state check
+    LaunchedEffect(hasStoragePermission) {
+        viewModel.refreshExternalDocuments()
+    }
 
     Scaffold(
         topBar = {
@@ -93,16 +203,66 @@ fun FilesScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 16.dp),
+                    .padding(bottom = 12.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "${state.documents.size} Documents",
+                    text = "${state.documents.size} Total Documents",
                     fontSize = 13.sp,
                     color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
                     fontWeight = FontWeight.Medium
                 )
+            }
+
+            // Storage Permission Banner
+            if (!hasStoragePermission) {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 16.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)
+                    ),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.15f))
+                ) {
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                "External Files Scanner",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                "Grant storage access to scan and display latest documents in your Downloads and Documents folder.",
+                                fontSize = 10.sp,
+                                lineHeight = 14.sp,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Button(
+                            onClick = {
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                    storagePermLauncher.launch(Manifest.permission.READ_MEDIA_IMAGES)
+                                } else {
+                                    storagePermLauncher.launch(Manifest.permission.READ_EXTERNAL_STORAGE)
+                                }
+                            },
+                            shape = RoundedCornerShape(12.dp),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                        ) {
+                            Text("Grant", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
             }
 
             // Document List or Empty State
@@ -227,6 +387,29 @@ fun EditableDocumentListItem(
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                if (document.tags.contains("External")) {
+                    val folder = document.tags.substringAfter("External,").uppercase()
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "•",
+                        fontSize = 10.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(MaterialTheme.colorScheme.secondaryContainer)
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = folder,
+                            fontSize = 8.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
+                    }
+                }
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = "•",

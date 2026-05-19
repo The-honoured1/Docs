@@ -1,6 +1,11 @@
 package com.ceo3.docs.ui.screens
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
+import android.os.Environment
+import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
@@ -27,7 +32,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.ViewModel
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.ceo3.docs.data.local.DocumentEntity
@@ -35,6 +40,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -53,18 +59,78 @@ class HomeViewModel(application: android.app.Application) : androidx.lifecycle.A
     val uiState: StateFlow<HomeUiState> = _uiState
 
     init {
-        viewModelScope.launch {
-            // Collect all documents ordered by lastModified DESC from Room
-            dao.getAllDocuments().collectLatest { list ->
+        refreshDocuments()
+    }
+
+    fun refreshDocuments() {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            dao.getAllDocuments().collectLatest { dbList ->
+                val deviceList = scanDeviceDocuments(getApplication())
+                val combined = (dbList + deviceList).sortedByDescending { it.lastModified }
                 _uiState.value = _uiState.value.copy(
-                    documents = list
+                    documents = combined
                 )
-                // Trigger search update if search is currently active
                 if (_uiState.value.searchQuery.isNotEmpty()) {
                     performSearch(_uiState.value.searchQuery)
                 }
             }
         }
+    }
+
+    private fun scanDeviceDocuments(context: android.content.Context): List<DocumentEntity> {
+        val list = mutableListOf<DocumentEntity>()
+        val extensions = listOf("pdf", "docx", "doc", "txt")
+        val scanDirs = mutableListOf<File>()
+
+        try {
+            val downloads = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+            if (downloads != null && downloads.exists()) {
+                scanDirs.add(downloads)
+            }
+        } catch (e: Exception) {}
+
+        try {
+            val docs = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS)
+            if (docs != null && docs.exists()) {
+                scanDirs.add(docs)
+            }
+        } catch (e: Exception) {}
+
+        // Fallbacks
+        val fallbackDownloads = File("/storage/emulated/0/Download")
+        if (fallbackDownloads.exists()) scanDirs.add(fallbackDownloads)
+        val fallbackDocs = File("/storage/emulated/0/Documents")
+        if (fallbackDocs.exists()) scanDirs.add(fallbackDocs)
+
+        for (dir in scanDirs) {
+            try {
+                val files = dir.listFiles()
+                if (files != null) {
+                    for (file in files) {
+                        if (file.isFile && file.extension.lowercase() in extensions) {
+                            val uniqueId = file.absolutePath
+                            if (list.none { it.id == uniqueId }) {
+                                list.add(
+                                    DocumentEntity(
+                                        id = uniqueId,
+                                        title = file.nameWithoutExtension,
+                                        type = file.extension.uppercase(),
+                                        lastModified = file.lastModified(),
+                                        isPinned = false,
+                                        tags = "External,${dir.name}",
+                                        accentTheme = "classic",
+                                        accentColor = "blue"
+                                    )
+                                )
+                            }
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("HomeViewModel", "Failed to scan folder ${dir.absolutePath}", e)
+            }
+        }
+        return list
     }
 
     fun onSearchQueryChange(query: String) {
@@ -100,14 +166,30 @@ fun HomeScreen(
     val state by viewModel.uiState.collectAsState()
     val context = LocalContext.current
 
-    // Set up file picker launcher for real files
+    // Launcher for selecting external system files on the fly
     val filePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
         uri?.let {
-            // Robustly URL-encode URIs before passing them in the route to avoid crashes due to slashes
             onNavigateToEditor(it.toString())
         }
+    }
+
+    var hasStoragePermission by remember {
+        mutableStateOf(
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                ContextCompat.checkSelfPermission(context, Manifest.permission.READ_MEDIA_IMAGES) ==
+                        PackageManager.PERMISSION_GRANTED
+            } else {
+                ContextCompat.checkSelfPermission(context, Manifest.permission.READ_EXTERNAL_STORAGE) ==
+                        PackageManager.PERMISSION_GRANTED
+            }
+        )
+    }
+
+    // Trigger document refresh upon load or permission change
+    LaunchedEffect(hasStoragePermission) {
+        viewModel.refreshDocuments()
     }
 
     Scaffold(
@@ -199,7 +281,6 @@ fun HomeScreen(
                 verticalArrangement = Arrangement.spacedBy(20.dp),
                 modifier = Modifier.fillMaxWidth().weight(1f)
             ) {
-                // If searching, display search results
                 if (state.isSearching) {
                     item {
                         Text(
@@ -266,7 +347,7 @@ fun HomeScreen(
                                 .border(
                                     BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.05f)),
                                     RoundedCornerShape(20.dp)
-                                )
+                                  )
                                 .clickable { onNavigateToDonate() }
                                 .padding(16.dp)
                         ) {
@@ -326,7 +407,7 @@ fun HomeScreen(
                             NoneEmptyState(text = "None")
                         }
                     } else {
-                        items(state.documents) { doc ->
+                        items(state.documents.take(12)) { doc ->
                             DocumentListItem(
                                 document = doc,
                                 onClick = { onNavigateToEditor(doc.id) }
@@ -338,93 +419,6 @@ fun HomeScreen(
                     Spacer(modifier = Modifier.height(20.dp))
                 }
             }
-        }
-    }
-}
-
-@Composable
-fun ActionCard(
-    title: String,
-    subtitle: String,
-    icon: ImageVector,
-    color: Color,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit
-) {
-    Card(
-        modifier = modifier
-            .clickable { onClick() },
-        shape = RoundedCornerShape(20.dp),
-        colors = CardColors(
-            containerColor = MaterialTheme.colorScheme.surface,
-            contentColor = MaterialTheme.colorScheme.onSurface,
-            disabledContainerColor = MaterialTheme.colorScheme.surface,
-            disabledContentColor = MaterialTheme.colorScheme.onSurface
-        ),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.08f))
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Box(
-                modifier = Modifier
-                    .size(44.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(color.copy(alpha = 0.15f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = color
-                )
-            }
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(
-                text = title,
-                fontWeight = FontWeight.Bold,
-                fontSize = 14.sp,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(
-                text = subtitle,
-                fontSize = 11.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-    }
-}
-
-@Composable
-fun NoneEmptyState(
-    text: String,
-    modifier: Modifier = Modifier
-) {
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(20.dp))
-            .background(MaterialTheme.colorScheme.surface)
-            .border(
-                BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.05f)),
-                RoundedCornerShape(20.dp)
-            )
-            .padding(vertical = 32.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Icon(
-                imageVector = Icons.Filled.Inbox,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-                modifier = Modifier.size(36.dp)
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = text,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Medium
-            )
         }
     }
 }
@@ -486,6 +480,29 @@ fun DocumentListItem(
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                if (document.tags.contains("External")) {
+                    val folder = document.tags.substringAfter("External,").uppercase()
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "•",
+                        fontSize = 10.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(MaterialTheme.colorScheme.secondaryContainer)
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = folder,
+                            fontSize = 8.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
+                    }
+                }
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = "•",

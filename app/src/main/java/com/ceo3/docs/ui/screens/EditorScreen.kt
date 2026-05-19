@@ -124,6 +124,13 @@ class EditorViewModel(application: android.app.Application) : AndroidViewModel(a
                         }
                     }
                     resolvedFile = cacheFile
+                } else if (docIdOrUri.startsWith("/")) {
+                    // ── Handle direct absolute file paths (e.g. from Downloads/Documents) ──
+                    val extFile = File(docIdOrUri)
+                    resolvedFile = extFile
+                    docTitle = extFile.nameWithoutExtension
+                    val extension = extFile.extension.uppercase()
+                    docType = if (extension in listOf("PDF", "DOCX", "DOC", "TXT")) extension else "PDF"
                 } else {
                     // ── Handle local DB document entries ──────────────────────────────
                     val docEntity = dao.getDocumentById(docIdOrUri)
