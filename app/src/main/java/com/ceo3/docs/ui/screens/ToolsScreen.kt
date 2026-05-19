@@ -1372,265 +1372,120 @@ fun ToolsScreen(
         ToolItem("Convert Format", Icons.Filled.SwapHoriz, Color(0xFFCFC3FF), Color(0xFFCFC3FF).copy(alpha = 0.15f), false, ToolActionType.CONVERT_FORMAT)
     )
 
-    val currentTools = when (state.selectedTab) {
-        "AI Tools" -> aiToolsList
-        "Image Scanner" -> scannerToolsList
-        else -> aiToolsList + scannerToolsList
+    val handleToolClick = { tool: ToolItem ->
+        when (tool.name) {
+            "AI Spell Check" -> {
+                activeToolName = "AI Spell Check"
+                spellCheckInputText = ""
+                spellCheckMistakes = emptyList()
+            }
+            "AI Translate" -> {
+                activeToolName = "AI Translate"
+                spellCheckInputText = ""
+                translationOutputText = ""
+            }
+            "Image Translate" -> {
+                imageTranslatePicker.launch("image/*")
+            }
+            "Docs Summarize" -> {
+                summarizePicker.launch("*/*")
+            }
+            "Chat PDF" -> {
+                chatPdfPicker.launch("*/*")
+            }
+            "BG Removal" -> {
+                bgRemovalPicker.launch("image/*")
+            }
+            "Image to Excel" -> {
+                imageExcelPicker.launch("image/*")
+            }
+            "Image to PPT" -> {
+                imagePptPicker.launch("image/*")
+            }
+            "Smart Eraser" -> {
+                smartEraserPicker.launch("image/*")
+            }
+            else -> {
+                when (tool.actionType) {
+                    ToolActionType.SCANNER -> onNavigateToScanner()
+                    ToolActionType.IMAGE_TO_PDF -> imageToPdfPicker.launch("image/*")
+                    ToolActionType.IMAGE_TO_TEXT -> imageToTextPicker.launch("image/*")
+                    ToolActionType.SUPPORT -> onNavigateToDonate()
+                    ToolActionType.COMPRESS_IMAGE -> imageCompressPicker.launch("image/*")
+                    ToolActionType.CONVERT_FORMAT -> formatConvertPicker.launch("image/*")
+                    ToolActionType.EXPORT_PDF_IMAGES -> pdfExportPicker.launch("application/pdf")
+                    ToolActionType.ENHANCE_IMAGE -> imageEnhancePicker.launch("image/*")
+                    ToolActionType.READ_ALOUD -> readAloudPicker.launch("*/*")
+                    else -> {
+                        viewModel.runSimulatedTool(
+                            tool.name,
+                            "Analyzing document using local models...",
+                            "AI execution completed! Changes applied."
+                        )
+                    }
+                }
+            }
+        }
     }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = {
-                    Text(
-                        "All Tools",
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onBackground
-                    )
-                },
-                actions = {
-                    IconButton(onClick = { /* Simulated Search Click */ }) {
-                        Icon(Icons.Filled.Search, contentDescription = "Search tools")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background
-                )
+                title = { Text("Tools & Utilities", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground) },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
             )
         },
         containerColor = MaterialTheme.colorScheme.background
     ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .padding(horizontal = 16.dp)
+        LazyColumn(
+            modifier = Modifier.fillMaxSize().padding(paddingValues).padding(horizontal = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(24.dp)
         ) {
-            // ── Category Tab Bar ─────────────────────────────────────────────
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 12.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                listOf("You May Like", "AI Tools", "Image Scanner").forEach { tab ->
-                    val selected = state.selectedTab == tab
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier
-                            .clickable { viewModel.setSelectedTab(tab) }
-                            .padding(bottom = 4.dp)
-                    ) {
-                        Text(
-                            text = tab,
-                            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                            fontSize = 14.sp,
-                            color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Box(
-                            modifier = Modifier
-                                .height(2.5.dp)
-                                .width(40.dp)
-                                .clip(CircleShape)
-                                .background(if (selected) MaterialTheme.colorScheme.primary else Color.Transparent)
-                        )
+            item {
+                Text(
+                    text = "AI Capabilities",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onBackground,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+                Column(
+                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp))
+                        .background(MaterialTheme.colorScheme.surface)
+                        .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.1f), RoundedCornerShape(20.dp))
+                ) {
+                    aiToolsList.forEachIndexed { index, tool ->
+                        ToolListItem(tool = tool, onClick = { handleToolClick(tool) })
+                        if (index < aiToolsList.lastIndex) {
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.08f), modifier = Modifier.padding(horizontal = 16.dp))
+                        }
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // Main View Area
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.spacedBy(20.dp)
-            ) {
-                // High-juice support card to replace paywalls
-                item {
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { onNavigateToDonate() },
-                        shape = RoundedCornerShape(20.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.08f))
-                    ) {
-                        Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Box(
-                                modifier = Modifier
-                                    .size(44.dp)
-                                    .clip(CircleShape)
-                                    .background(MaterialTheme.colorScheme.secondary.copy(alpha = 0.15f)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(Icons.Filled.CardGiftcard, contentDescription = null, tint = MaterialTheme.colorScheme.secondary)
-                            }
-                            Spacer(modifier = Modifier.width(16.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    "No Premium Paywalls Here!",
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 14.sp
-                                )
-                                Text(
-                                    "All document utilities are 100% free. Help us keep them that way with a small support!",
-                                    fontSize = 11.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                            Icon(Icons.Filled.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            item {
+                Text(
+                    text = "Image & PDF Scanner",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onBackground,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+                Column(
+                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp))
+                        .background(MaterialTheme.colorScheme.surface)
+                        .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.1f), RoundedCornerShape(20.dp))
+                ) {
+                    scannerToolsList.forEachIndexed { index, tool ->
+                        ToolListItem(tool = tool, onClick = { handleToolClick(tool) })
+                        if (index < scannerToolsList.lastIndex) {
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.08f), modifier = Modifier.padding(horizontal = 16.dp))
                         }
                     }
-                }
-
-                // Headline
-                item {
-                    Text(
-                        text = state.selectedTab,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onBackground
-                    )
-                }
-
-                // Tools Grid
-                item {
-                    Column(
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        val chunks = currentTools.chunked(4)
-                        chunks.forEach { rowItems ->
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 12.dp),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                rowItems.forEach { tool ->
-                                    Box(
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .clickable {
-                                                when (tool.name) {
-                                                    "AI Spell Check" -> {
-                                                        activeToolName = "AI Spell Check"
-                                                        spellCheckInputText = ""
-                                                        spellCheckMistakes = emptyList()
-                                                    }
-                                                    "AI Translate" -> {
-                                                        activeToolName = "AI Translate"
-                                                        spellCheckInputText = ""
-                                                        translationOutputText = ""
-                                                    }
-                                                    "Image Translate" -> {
-                                                        imageTranslatePicker.launch("image/*")
-                                                    }
-                                                    "Docs Summarize" -> {
-                                                        summarizePicker.launch("*/*")
-                                                    }
-                                                    "Chat PDF" -> {
-                                                        chatPdfPicker.launch("*/*")
-                                                    }
-                                                    "BG Removal" -> {
-                                                        bgRemovalPicker.launch("image/*")
-                                                    }
-                                                    "Image to Excel" -> {
-                                                        imageExcelPicker.launch("image/*")
-                                                    }
-                                                    "Image to PPT" -> {
-                                                        imagePptPicker.launch("image/*")
-                                                    }
-                                                    "Smart Eraser" -> {
-                                                        smartEraserPicker.launch("image/*")
-                                                    }
-                                                    else -> {
-                                                        when (tool.actionType) {
-                                                            ToolActionType.SCANNER -> onNavigateToScanner()
-                                                            ToolActionType.IMAGE_TO_PDF -> imageToPdfPicker.launch("image/*")
-                                                            ToolActionType.IMAGE_TO_TEXT -> imageToTextPicker.launch("image/*")
-                                                            ToolActionType.SUPPORT -> onNavigateToDonate()
-                                                            ToolActionType.COMPRESS_IMAGE -> imageCompressPicker.launch("image/*")
-                                                            ToolActionType.CONVERT_FORMAT -> formatConvertPicker.launch("image/*")
-                                                            ToolActionType.EXPORT_PDF_IMAGES -> pdfExportPicker.launch("application/pdf")
-                                                            ToolActionType.ENHANCE_IMAGE -> imageEnhancePicker.launch("image/*")
-                                                            ToolActionType.READ_ALOUD -> readAloudPicker.launch("*/*")
-                                                            else -> {
-                                                                viewModel.runSimulatedTool(
-                                                                    tool.name,
-                                                                    "Analyzing document using local models...",
-                                                                    "AI execution completed! Changes applied."
-                                                                )
-                                                            }
-                                                        }
-                                                    }
-                                                }
-                                            },
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Column(
-                                            horizontalAlignment = Alignment.CenterHorizontally,
-                                            modifier = Modifier.fillMaxWidth()
-                                        ) {
-                                            Box(modifier = Modifier.size(56.dp)) {
-                                                Box(
-                                                    modifier = Modifier
-                                                        .size(52.dp)
-                                                        .align(Alignment.Center)
-                                                        .clip(CircleShape)
-                                                        .background(tool.bgColor),
-                                                    contentAlignment = Alignment.Center
-                                                ) {
-                                                    Icon(
-                                                        imageVector = tool.icon,
-                                                        contentDescription = tool.name,
-                                                        tint = tool.iconColor,
-                                                        modifier = Modifier.size(26.dp)
-                                                    )
-                                                }
-                                                if (tool.isNew) {
-                                                    Box(
-                                                        modifier = Modifier
-                                                            .clip(RoundedCornerShape(6.dp))
-                                                            .background(Color(0xFFE57373))
-                                                            .align(Alignment.TopEnd)
-                                                            .padding(horizontal = 4.dp, vertical = 1.dp)
-                                                    ) {
-                                                        Text(
-                                                            "NEW",
-                                                            fontSize = 7.sp,
-                                                            color = Color.White,
-                                                            fontWeight = FontWeight.Bold
-                                                        )
-                                                    }
-                                                }
-                                            }
-                                            Spacer(modifier = Modifier.height(6.dp))
-                                            Text(
-                                                text = tool.name,
-                                                fontSize = 11.sp,
-                                                fontWeight = FontWeight.Medium,
-                                                textAlign = TextAlign.Center,
-                                                color = MaterialTheme.colorScheme.onBackground,
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis
-                                            )
-                                        }
-                                    }
-                                }
-                                if (rowItems.size < 4) {
-                                    repeat(4 - rowItems.size) {
-                                        Spacer(modifier = Modifier.weight(1f))
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-                item {
-                    Spacer(modifier = Modifier.height(24.dp))
                 }
             }
+
+            item { Spacer(modifier = Modifier.height(24.dp)) }
         }
     }
 
@@ -2099,6 +1954,69 @@ fun ToolsScreen(
                     }
                 }
             }
+        )
+    }
+}
+
+@Composable
+fun ToolListItem(
+    tool: ToolItem,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 14.dp, horizontal = 16.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(36.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .background(tool.bgColor),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = tool.icon,
+                contentDescription = null,
+                tint = tool.iconColor,
+                modifier = Modifier.size(18.dp)
+            )
+        }
+
+        Spacer(modifier = Modifier.width(14.dp))
+
+        Text(
+            text = tool.name,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.weight(1f)
+        )
+
+        if (tool.isNew) {
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(Color(0xFFE57373))
+                    .padding(horizontal = 6.dp, vertical = 2.dp)
+            ) {
+                Text(
+                    text = "NEW",
+                    fontSize = 8.sp,
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            Spacer(modifier = Modifier.width(8.dp))
+        }
+
+        Icon(
+            imageVector = Icons.Filled.ChevronRight,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+            modifier = Modifier.size(16.dp)
         )
     }
 }
