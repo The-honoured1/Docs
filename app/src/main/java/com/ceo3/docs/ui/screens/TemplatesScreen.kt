@@ -278,6 +278,35 @@ This proposal outlines the strategy to redesign and re-engineer our customer por
 
 ## Future Outlook
 In 2026, we aim to accelerate investments in artificial intelligence features and scale our enterprise sales organization."""
+            ),
+            TemplateItem(
+                title = "Project Pitch Deck",
+                description = "Stunning slide outline for project proposal presentations.",
+                type = "PPT",
+                category = "Business",
+                iconColor = Color(0xFFF59E0B),
+                content = """SLIDE 1
+Title: Project Pitch Deck
+Subtitle: Re-Engineering Our Customer Portal
+Presenter: Tech Solutions Group
+
+SLIDE 2
+Executive Summary
+• Need a modern, mobile-friendly portal
+• Speed & efficiency gains are paramount
+• Seamless Next.js frontend architecture
+
+SLIDE 3
+Core Objectives
+• Increase page load speeds by 50%
+• Streamline automated self-service registration
+• Lower customer support tickets by 20%
+
+SLIDE 4
+Project Scope & Timeline
+• Phase 1: UX Wireframes & Discovery (1mo)
+• Phase 2: React & Backend Integration (2mo)
+• Phase 3: Comprehensive QA & UAT (1mo)"""
             )
         )
     }

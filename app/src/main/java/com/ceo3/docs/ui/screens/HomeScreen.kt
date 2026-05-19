@@ -556,7 +556,9 @@ fun HomeScreen(
                                         arrayOf(
                                             "application/pdf",
                                             "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                                            "text/plain"
+                                            "text/plain",
+                                            "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                                            "application/vnd.ms-powerpoint"
                                         )
                                     )
                                 }
@@ -644,7 +646,8 @@ fun DocumentRowItem(
         "PDF"        -> Triple(Icons.Filled.PictureAsPdf, AccentRose.copy(alpha = 0.12f), AccentRose)
         "DOCX","DOC" -> Triple(Icons.Filled.Description, AccentSky.copy(alpha = 0.12f), AccentSky)
         "XLSX","XLS" -> Triple(Icons.Filled.GridOn, AccentEmerald.copy(alpha = 0.12f), AccentEmerald)
-        else         -> Triple(Icons.Filled.TextSnippet, AccentAmber.copy(alpha = 0.12f), AccentAmber)
+        "PPT","PPTX" -> Triple(Icons.Filled.Slideshow, AccentAmber.copy(alpha = 0.12f), AccentAmber)
+        else         -> Triple(Icons.Filled.TextSnippet, Color(0xFF6B7280).copy(alpha = 0.12f), Color(0xFF6B7280))
     }
 
     val timeLabel = when (doc.id) {

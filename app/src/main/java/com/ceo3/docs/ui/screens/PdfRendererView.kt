@@ -157,7 +157,7 @@ fun PdfRendererView(file: File) {
                         scale = 1f
                         offset = Offset.Zero
                     }) {
-                        Icon(Icons.Filled.SearchOff, contentDescription = "Reset Zoom")
+                        Icon(Icons.Filled.ZoomOut, contentDescription = "Reset Zoom")
                     }
                 }
 

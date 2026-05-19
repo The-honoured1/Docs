@@ -188,6 +188,7 @@ fun SharedDocItemCard(
     val (icon, iconBg, iconTint) = when (item.type) {
         "PDF" -> Triple(Icons.Filled.PictureAsPdf, AccentRose.copy(alpha = 0.12f), AccentRose)
         "DOCX" -> Triple(Icons.Filled.Description, AccentSky.copy(alpha = 0.12f), AccentSky)
+        "PPT", "PPTX" -> Triple(Icons.Filled.Slideshow, AccentAmber.copy(alpha = 0.12f), AccentAmber)
         else -> Triple(Icons.Filled.GridOn, AccentEmerald.copy(alpha = 0.12f), AccentEmerald)
     }
 
