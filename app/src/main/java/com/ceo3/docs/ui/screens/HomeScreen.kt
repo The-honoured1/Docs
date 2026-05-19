@@ -71,6 +71,14 @@ data class HomeUiState(
     val allDocs: List<DocumentModel> = emptyList()
 )
 
+data class BannerItem(
+    val title: String,
+    val subtitle: String,
+    val buttonText: String,
+    val color: Color,
+    val accentColor: Color
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
@@ -87,74 +95,41 @@ fun HomeScreen(
         onResult = { uri -> uri?.let { onNavigateToEditor(it.toString()) } }
     )
 
-    Scaffold(containerColor = MaterialTheme.colorScheme.background) { paddingValues ->
+    Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
+        floatingActionButton = {
+            ExtendedFloatingActionButton(
+                onClick = {
+                    documentPickerLauncher.launch(
+                        arrayOf(
+                            "application/pdf",
+                            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                            "application/msword"
+                        )
+                    )
+                },
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+                shape = RoundedCornerShape(24.dp),
+                modifier = Modifier.padding(bottom = 16.dp, end = 8.dp)
+            ) {
+                Icon(Icons.Filled.Add, contentDescription = "Create")
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Create", fontWeight = FontWeight.Bold)
+            }
+        }
+    ) { paddingValues ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
                 .verticalScroll(scrollState)
         ) {
-            // ── Compact Header ─────────────────────────────────────────────
+            // ── Top Bar Search (WPS Style) ────────────────────────────────
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(start = 24.dp, end = 24.dp, top = 24.dp, bottom = 16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(
-                    text = "Docs",
-                    style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.ExtraBold),
-                    color = MaterialTheme.colorScheme.onBackground
-                )
-                Icon(
-                    imageVector = Icons.Outlined.Folder,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(28.dp)
-                )
-            }
-
-            // ── Simplified Action Grid ────────────────────────────────────
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                ActionCard(
-                    modifier = Modifier.weight(1f).aspectRatio(0.95f),
-                    title = "Scan",
-                    subtitle = "Scan pages, auto-crop & OCR",
-                    icon = Icons.Outlined.DocumentScanner,
-                    backgroundColor = MaterialTheme.colorScheme.surfaceVariant,
-                    onClick = onNavigateToScanner
-                )
-                ActionCard(
-                    modifier = Modifier.weight(1f).aspectRatio(0.95f),
-                    title = "Open / Edit",
-                    subtitle = "View or sign PDF / Word files",
-                    icon = Icons.Outlined.OpenInNew,
-                    backgroundColor = MaterialTheme.colorScheme.secondary.copy(alpha = 0.2f),
-                    onClick = {
-                        documentPickerLauncher.launch(
-                            arrayOf(
-                                "application/pdf",
-                                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                                "application/msword"
-                            )
-                        )
-                    }
-                )
-            }
-
-            Spacer(modifier = Modifier.height(32.dp))
-
-            // ── Search Bar ────────────────────────────────────────────────
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp)
+                    .padding(horizontal = 24.dp, vertical = 20.dp)
                     .height(56.dp)
                     .clip(RoundedCornerShape(28.dp))
                     .background(MaterialTheme.colorScheme.surface),
@@ -163,28 +138,37 @@ fun HomeScreen(
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(horizontal = 20.dp).weight(1f)
+                    modifier = Modifier.padding(horizontal = 16.dp).weight(1f)
                 ) {
-                    Icon(
-                        Icons.Outlined.Search,
-                        contentDescription = "Search",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Box(modifier = Modifier.fillMaxWidth()) {
+                    // Drawer Icon with red dot badge
+                    Box(modifier = Modifier.size(24.dp)) {
+                        Icon(
+                            Icons.Filled.Menu,
+                            contentDescription = "Menu",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Box(
+                            modifier = Modifier
+                                .size(8.dp)
+                                .clip(CircleShape)
+                                .background(Color.Red)
+                                .align(Alignment.TopEnd)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Box(modifier = Modifier.weight(1f)) {
                         if (searchQuery.isEmpty()) {
                             Text(
-                                "Search files…",
+                                "Search files, tools…",
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                fontSize = 16.sp
+                                fontSize = 15.sp
                             )
                         }
                         BasicTextField(
                             value = searchQuery,
                             onValueChange = { searchQuery = it },
                             textStyle = TextStyle(
-                                fontSize = 16.sp,
+                                fontSize = 15.sp,
                                 color = MaterialTheme.colorScheme.onSurface
                             ),
                             modifier = Modifier.fillMaxWidth(),
@@ -192,205 +176,318 @@ fun HomeScreen(
                         )
                     }
                 }
-                if (searchQuery.isNotEmpty()) {
-                    Icon(
-                        imageVector = Icons.Outlined.Close,
-                        contentDescription = "Clear",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(end = 16.dp)
+                ) {
+                    if (searchQuery.isNotEmpty()) {
+                        Icon(
+                            imageVector = Icons.Filled.Close,
+                            contentDescription = "Clear",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier
+                                .size(20.dp)
+                                .clickable { searchQuery = "" }
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                    }
+                    // Profile Avatar (Chris)
+                    Box(
                         modifier = Modifier
-                            .padding(end = 20.dp)
-                            .size(20.dp)
-                            .clickable { searchQuery = "" }
-                    )
+                            .size(32.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.primary),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "C",
+                            color = MaterialTheme.colorScheme.onPrimary,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp
+                        )
+                    }
                 }
             }
 
-            Spacer(modifier = Modifier.height(32.dp))
+            // ── Interactive Feature Banner Carousel ──────────────────────
+            var currentBannerIndex by remember { mutableStateOf(0) }
+            val banners = listOf(
+                BannerItem(
+                    title = "PDF Edit",
+                    subtitle = "PDF editing has never been easier. Add signs, draws, and text.",
+                    buttonText = "Try It",
+                    color = Color(0xFFFFEBEE),
+                    accentColor = Color(0xFFD32F2F)
+                ),
+                BannerItem(
+                    title = "Document Converter",
+                    subtitle = "Convert images, scans, and word files into high quality PDFs.",
+                    buttonText = "Convert",
+                    color = Color(0xFFE8F5E9),
+                    accentColor = Color(0xFF388E3C)
+                ),
+                BannerItem(
+                    title = "Support Docs",
+                    subtitle = "Help keep this app free & private. Consider a small donation!",
+                    buttonText = "Donate",
+                    color = Color(0xFFECEFF1),
+                    accentColor = Color(0xFF37474F)
+                )
+            )
 
-            // ── Recent Files / Search Results ─────────────────────────────
+            // Auto transition banners every 5 seconds
+            LaunchedEffect(Unit) {
+                while (true) {
+                    kotlinx.coroutines.delay(5000)
+                    currentBannerIndex = (currentBannerIndex + 1) % banners.size
+                }
+            }
+
+            androidx.compose.animation.Crossfade(
+                targetState = banners[currentBannerIndex],
+                animationSpec = androidx.compose.animation.core.tween(500),
+                label = "bannerAnimation"
+            ) { banner ->
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp, vertical = 8.dp)
+                        .height(130.dp),
+                    shape = RoundedCornerShape(24.dp),
+                    colors = CardDefaults.cardColors(containerColor = banner.color)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(18.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = banner.title,
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = banner.accentColor
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = banner.subtitle,
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                lineHeight = 16.sp,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Button(
+                            onClick = {
+                                documentPickerLauncher.launch(
+                                    arrayOf(
+                                        "application/pdf",
+                                        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                                        "application/msword"
+                                    )
+                                )
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = banner.accentColor),
+                            shape = RoundedCornerShape(14.dp),
+                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)
+                        ) {
+                            Text(text = banner.buttonText, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // ── Recent Files / Search Results Vertical Feed ──────────────
             if (searchQuery.isNotEmpty()) {
                 val searchResults = state.allDocs.filter {
                     it.title.contains(searchQuery, ignoreCase = true)
                 }
                 Text(
                     text = "Search Results",
-                    fontSize = 20.sp,
+                    fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onBackground,
                     modifier = Modifier.padding(horizontal = 24.dp)
                 )
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
                 if (searchResults.isNotEmpty()) {
-                    LazyRow(
-                        modifier = Modifier.fillMaxWidth(),
-                        contentPadding = PaddingValues(horizontal = 24.dp),
-                        horizontalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        items(searchResults) { doc ->
-                            RecentFileCard(doc = doc, onClick = { onNavigateToEditor(doc.id) })
-                        }
+                    searchResults.forEach { doc ->
+                        VerticalFileListItem(doc = doc, onClick = { onNavigateToEditor(doc.id) })
                     }
                 } else {
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 24.dp)
-                            .height(120.dp),
-                        shape = RoundedCornerShape(24.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-                    ) {
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
+                    EmptyStateCard()
+                }
+            } else {
+                // Sub-tabs for Recent / Pinned
+                var selectedSubTab by remember { mutableStateOf(0) }
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp),
+                    horizontalArrangement = Arrangement.spacedBy(24.dp)
+                ) {
+                    val subTabs = listOf("Recent", "Pinned")
+                    subTabs.forEachIndexed { index, title ->
+                        val active = selectedSubTab == index
+                        Column(
+                            modifier = Modifier.clickable { selectedSubTab = index },
+                            horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             Text(
-                                text = "None",
+                                text = title,
                                 fontSize = 16.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                             )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            if (active) {
+                                Box(
+                                    modifier = Modifier
+                                        .width(32.dp)
+                                        .height(3.dp)
+                                        .clip(CircleShape)
+                                        .background(MaterialTheme.colorScheme.primary)
+                                )
+                            }
                         }
                     }
                 }
-            } else {
-                Text(
-                    text = "Recent files",
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onBackground,
-                    modifier = Modifier.padding(horizontal = 24.dp)
-                )
+
                 Spacer(modifier = Modifier.height(16.dp))
 
-                if (state.recentDocs.isNotEmpty()) {
-                    LazyRow(
-                        modifier = Modifier.fillMaxWidth(),
-                        contentPadding = PaddingValues(horizontal = 24.dp),
-                        horizontalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        items(state.recentDocs) { doc ->
-                            RecentFileCard(doc = doc, onClick = { onNavigateToEditor(doc.id) })
-                        }
+                val displayDocs = if (selectedSubTab == 0) state.recentDocs else state.pinnedDocs
+                if (displayDocs.isNotEmpty()) {
+                    displayDocs.forEach { doc ->
+                        VerticalFileListItem(doc = doc, onClick = { onNavigateToEditor(doc.id) })
                     }
                 } else {
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 24.dp)
-                            .height(120.dp),
-                        shape = RoundedCornerShape(24.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-                    ) {
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "None",
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
+                    EmptyStateCard()
                 }
             }
 
-            Spacer(modifier = Modifier.height(100.dp))
+            Spacer(modifier = Modifier.height(120.dp))
         }
     }
 }
 
 @Composable
-fun ActionCard(
-    modifier: Modifier = Modifier,
-    title: String,
-    subtitle: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    backgroundColor: Color,
-    onClick: () -> Unit
-) {
-    Card(
-        modifier = modifier.clickable { onClick() },
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = backgroundColor)
-    ) {
-        Column(
-            modifier = Modifier.padding(20.dp).fillMaxSize(),
-            horizontalAlignment = Alignment.Start,
-            verticalArrangement = Arrangement.Top
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
-                modifier = Modifier.size(32.dp)
-            )
-            Spacer(modifier = Modifier.weight(1f))
-            Text(
-                text = title,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onBackground
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = subtitle,
-                fontSize = 12.sp,
-                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
-                textAlign = TextAlign.Start,
-                lineHeight = 15.sp,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-    }
-}
-
-@Composable
-fun RecentFileCard(doc: DocumentModel, onClick: () -> Unit) {
-    val bgColor = when (doc.type.uppercase()) {
-        "XLS", "XLSX" -> MaterialTheme.colorScheme.tertiary.copy(alpha = 0.3f)
-        "JPG", "PNG"  -> MaterialTheme.colorScheme.secondary.copy(alpha = 0.3f)
-        "DOC", "DOCX" -> MaterialTheme.colorScheme.secondary.copy(alpha = 0.5f)
-        "PDF"          -> MaterialTheme.colorScheme.error.copy(alpha = 0.15f)
-        else           -> MaterialTheme.colorScheme.surface
-    }
-
+fun VerticalFileListItem(doc: DocumentModel, onClick: () -> Unit) {
     val iconColor = when (doc.type.uppercase()) {
-        "PDF"          -> MaterialTheme.colorScheme.error
-        else           -> MaterialTheme.colorScheme.primary
+        "PDF"          -> Color(0xFFE53935) // Red
+        "DOC", "DOCX" -> Color(0xFF1E88E5) // Blue
+        "XLS", "XLSX" -> Color(0xFF43A047) // Green
+        else           -> Color(0xFFFFB300) // Orange
     }
 
+    val iconBg = iconColor.copy(alpha = 0.12f)
+
     Card(
-        modifier = Modifier.width(140.dp).height(180.dp).clickable { onClick() },
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = bgColor)
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 24.dp, vertical = 6.dp)
+            .clickable { onClick() },
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
-        Column(
-            modifier = Modifier.padding(16.dp).fillMaxSize(),
-            horizontalAlignment = Alignment.Start,
-            verticalArrangement = Arrangement.Top
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(iconBg),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Description,
+                    contentDescription = null,
+                    tint = iconColor,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+            Spacer(modifier = Modifier.width(16.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = doc.title,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = doc.type.uppercase(),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = iconColor
+                    )
+                    Text(
+                        text = "•",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = doc.lastModified,
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.width(8.dp))
             Icon(
-                imageVector = Icons.Filled.Description,
+                imageVector = Icons.Filled.ChevronRight,
                 contentDescription = null,
-                tint = iconColor,
-                modifier = Modifier.size(32.dp)
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                modifier = Modifier.size(20.dp)
             )
-            Spacer(modifier = Modifier.weight(1f))
-            Text(
-                text = doc.title,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onBackground,
-                textAlign = TextAlign.Start,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(text = doc.type.uppercase(), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+@Composable
+fun EmptyStateCard() {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 24.dp, vertical = 8.dp)
+            .height(140.dp),
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+    ) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Icon(
+                    imageVector = Icons.Filled.History,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                    modifier = Modifier.size(36.dp)
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = "No documents found",
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
     }
 }

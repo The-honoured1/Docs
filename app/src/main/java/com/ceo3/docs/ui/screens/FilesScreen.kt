@@ -91,13 +91,14 @@ fun FilesScreen(
     viewModel: FilesViewModel = viewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
+    val scrollState = rememberScrollState()
     var searchQuery by remember { mutableStateOf("") }
-    var showSearch by remember { mutableStateOf(false) }
+    var selectedType by remember { mutableStateOf<String?>(null) }
     var pendingDeleteId by remember { mutableStateOf<String?>(null) }
 
     val displayItems = state.items.filter { item ->
         (searchQuery.isEmpty() || item.name.contains(searchQuery, ignoreCase = true)) &&
-                (state.selectedTag == null || state.selectedTag == "All")
+        (selectedType == null || item.sizeLabel.uppercase() == selectedType)
     }
 
     // Confirm-delete dialog
@@ -133,245 +134,396 @@ fun FilesScreen(
     Scaffold(containerColor = MaterialTheme.colorScheme.background) { paddingValues ->
         Column(
             modifier = Modifier
-                .padding(paddingValues)
                 .fillMaxSize()
+                .padding(paddingValues)
+                .verticalScroll(scrollState)
         ) {
-            // ── Header ────────────────────────────────────────────────────
+            // ── Top Bar Search (WPS Style) ────────────────────────────────
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 24.dp, vertical = 24.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                    .padding(horizontal = 24.dp, vertical = 20.dp)
+                    .height(56.dp)
+                    .clip(RoundedCornerShape(28.dp))
+                    .background(MaterialTheme.colorScheme.surface),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                if (showSearch) {
-                    Row(
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(48.dp)
-                            .clip(RoundedCornerShape(24.dp))
-                            .background(MaterialTheme.colorScheme.surface)
-                            .padding(horizontal = 16.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(horizontal = 16.dp).weight(1f)
+                ) {
+                    Box(modifier = Modifier.size(24.dp)) {
                         Icon(
-                            Icons.Filled.Search,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(18.dp)
+                            Icons.Filled.Menu,
+                            contentDescription = "Menu",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                        Spacer(Modifier.width(8.dp))
-                        Box(modifier = Modifier.weight(1f)) {
-                            if (searchQuery.isEmpty()) {
-                                Text(
-                                    "Search files…",
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    fontSize = 15.sp
-                                )
-                            }
-                            BasicTextField(
-                                value = searchQuery,
-                                onValueChange = { searchQuery = it },
-                                textStyle = TextStyle(
-                                    fontSize = 15.sp,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                ),
-                                modifier = Modifier.fillMaxWidth(),
-                                singleLine = true
+                    }
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Box(modifier = Modifier.weight(1f)) {
+                        if (searchQuery.isEmpty()) {
+                            Text(
+                                "Search files, tools…",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontSize = 15.sp
                             )
                         }
-                    }
-                    Spacer(Modifier.width(12.dp))
-                    Box(
-                        modifier = Modifier
-                            .size(48.dp)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.surface)
-                            .clickable { showSearch = false; searchQuery = "" },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            Icons.Filled.Close,
-                            contentDescription = "Close search",
-                            tint = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-                } else {
-                    Text(
-                        "Files & Folders",
-                        fontSize = 28.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onBackground,
-                        modifier = Modifier.weight(1f)
-                    )
-                    Box(
-                        modifier = Modifier
-                            .size(48.dp)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.surface)
-                            .clickable { showSearch = true },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            Icons.Filled.Search,
-                            contentDescription = "Search",
-                            tint = MaterialTheme.colorScheme.onSurface
+                        BasicTextField(
+                            value = searchQuery,
+                            onValueChange = { searchQuery = it },
+                            textStyle = TextStyle(
+                                fontSize = 15.sp,
+                                color = MaterialTheme.colorScheme.onSurface
+                            ),
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
                         )
                     }
                 }
-            }
-
-            // ── Tag filter row ────────────────────────────────────────────
-            LazyRow(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp, vertical = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                items(state.tags) { tag ->
-                    val selected = state.selectedTag == tag
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(end = 16.dp)
+                ) {
+                    if (searchQuery.isNotEmpty()) {
+                        Icon(
+                            imageVector = Icons.Filled.Close,
+                            contentDescription = "Clear",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier
+                                .size(20.dp)
+                                .clickable { searchQuery = "" }
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                    }
+                    // Profile Avatar (Chris)
                     Box(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(20.dp))
-                            .background(
-                                if (selected) MaterialTheme.colorScheme.onBackground
-                                else MaterialTheme.colorScheme.surface
-                            )
-                            .clickable { viewModel.selectTag(tag) }
-                            .padding(horizontal = 18.dp, vertical = 9.dp)
+                            .size(32.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.primary),
+                        contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = tag,
-                            color = if (selected) MaterialTheme.colorScheme.background
-                                    else MaterialTheme.colorScheme.onSurface,
-                            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                            text = "C",
+                            color = MaterialTheme.colorScheme.onPrimary,
+                            fontWeight = FontWeight.Bold,
                             fontSize = 14.sp
                         )
                     }
                 }
             }
 
-            Spacer(Modifier.height(16.dp))
-
-            // ── Summary label ─────────────────────────────────────────────
-            Text(
-                "${displayItems.size} document${if (displayItems.size != 1) "s" else ""}",
-                fontSize = 13.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp)
+            // ── File Type Shortcuts Grid (WPS Style) ──────────────────────
+            val fileTypes = listOf(
+                Triple("DOC", Icons.Filled.Description, Color(0xFF1E88E5)),
+                Triple("PDF", Icons.Filled.Description, Color(0xFFE53935)),
+                Triple("XLS", Icons.Filled.Description, Color(0xFF43A047)),
+                Triple("PPT", Icons.Filled.Description, Color(0xFFFF8C00)),
+                Triple("TXT", Icons.Filled.Description, Color(0xFF9C27B0))
             )
 
-            // ── File list / Empty State ───────────────────────────────────
-            if (displayItems.isEmpty()) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(horizontal = 24.dp, vertical = 40.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Card(
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                fileTypes.forEach { (type, icon, color) ->
+                    val active = selectedType == type
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .height(140.dp),
-                        shape = RoundedCornerShape(24.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                            .clickable { selectedType = if (active) null else type }
+                            .padding(8.dp)
                     ) {
                         Box(
-                            modifier = Modifier.fillMaxSize(),
+                            modifier = Modifier
+                                .size(50.dp)
+                                .clip(CircleShape)
+                                .background(
+                                    if (active) color else color.copy(alpha = 0.12f)
+                                ),
                             contentAlignment = Alignment.Center
                         ) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Icon(
-                                    imageVector = Icons.Outlined.Folder,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                                    modifier = Modifier.size(36.dp)
-                                )
-                                Spacer(modifier = Modifier.height(12.dp))
-                                Text(
-                                    text = "None",
-                                    fontSize = 16.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
+                            Icon(
+                                imageVector = icon,
+                                contentDescription = type,
+                                tint = if (active) Color.White else color,
+                                modifier = Modifier.size(24.dp)
+                            )
                         }
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = type,
+                            fontSize = 12.sp,
+                            fontWeight = if (active) FontWeight.Bold else FontWeight.Medium,
+                            color = if (active) color else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 }
-            } else {
-                LazyColumn(
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+            Text(
+                text = "Locations",
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onBackground,
+                modifier = Modifier.padding(horizontal = 24.dp)
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // This Device Card with Storage Indicator Bar
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp, vertical = 4.dp),
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            ) {
+                Column(modifier = Modifier.padding(18.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Computer,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(14.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "This Device",
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "41.4 GB used of 128 GB",
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
+                    LinearProgressIndicator(
+                        progress = 0.32f,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(6.dp)
+                            .clip(RoundedCornerShape(3.dp)),
+                        color = MaterialTheme.colorScheme.primary,
+                        trackColor = MaterialTheme.colorScheme.surfaceVariant
+                    )
+                }
+            }
+
+            // Quick Access Folders (Downloads, Documents)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Card(
                     modifier = Modifier
-                        .fillMaxSize()
-                        .padding(horizontal = 24.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                    contentPadding = PaddingValues(bottom = 120.dp, top = 4.dp)
+                        .weight(1f)
+                        .clickable { },
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
                 ) {
-                    items(displayItems, key = { it.id }) { item ->
-                        if (item.isFolder) {
-                            FolderItem(item = item, onClick = {})
-                        } else {
-                            FileListItem(
-                                item    = item,
-                                onClick = { onDocumentClick(item.id) },
-                                onDelete = { pendingDeleteId = item.id }
+                    Row(
+                        modifier = Modifier.padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Download,
+                            contentDescription = null,
+                            tint = Color(0xFFFF8C00),
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text(
+                            text = "Downloads",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                }
+
+                Card(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clickable { },
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Folder,
+                            contentDescription = null,
+                            tint = Color(0xFF1E88E5),
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text(
+                            text = "Documents",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Cloud Accounts
+            Text(
+                text = "Cloud Accounts",
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onBackground,
+                modifier = Modifier.padding(horizontal = 24.dp)
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp),
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            ) {
+                Column {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { }
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.CloudQueue,
+                            contentDescription = null,
+                            tint = Color(0xFF4285F4),
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column {
+                            Text(
+                                text = "Google Drive",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "connected: chris.dev@gmail.com",
+                                fontSize = 11.sp,
+                                color = Color(0xFF4CAF50)
+                            )
+                        }
+                    }
+                    Divider(color = MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.padding(horizontal = 16.dp))
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { }
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.CloudQueue,
+                            contentDescription = null,
+                            tint = Color(0xFF0078D4),
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column {
+                            Text(
+                                text = "OneDrive",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "Tap to connect",
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
                 }
             }
-        }
-    }
-}
 
-// ─── Folder card ──────────────────────────────────────────────────────────────
+            Spacer(modifier = Modifier.height(24.dp))
 
-@Composable
-fun FolderItem(item: FileItem, onClick: () -> Unit) {
-    Card(
-        modifier = Modifier.fillMaxWidth().clickable { onClick() },
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
-        )
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.background.copy(alpha = 0.5f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    Icons.Filled.Folder,
-                    contentDescription = "Folder",
-                    tint = MaterialTheme.colorScheme.onBackground,
-                    modifier = Modifier.size(24.dp)
-                )
-            }
-            Spacer(Modifier.width(16.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    item.name,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onBackground
-                )
-                Text(
-                    "${item.itemCount} items",
-                    fontSize = 13.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            Icon(
-                Icons.Filled.ChevronRight,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(20.dp)
+            // ── Local Documents Section ───────────────────────────────────
+            Text(
+                text = "Local Documents",
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onBackground,
+                modifier = Modifier.padding(horizontal = 24.dp)
             )
+            Spacer(modifier = Modifier.height(12.dp))
+
+            if (displayItems.isEmpty()) {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp, vertical = 8.dp)
+                        .height(120.dp),
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                ) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "None",
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            } else {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    displayItems.forEach { item ->
+                        FileListItem(
+                            item = item,
+                            onClick = { onDocumentClick(item.id) },
+                            onDelete = { pendingDeleteId = item.id }
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(120.dp))
         }
     }
 }
@@ -382,17 +534,13 @@ fun FolderItem(item: FileItem, onClick: () -> Unit) {
 @Composable
 fun FileListItem(item: FileItem, onClick: () -> Unit, onDelete: () -> Unit) {
     val typeColor = when (item.sizeLabel.uppercase()) {
-        "PDF"       -> MaterialTheme.colorScheme.error.copy(alpha = 0.15f)
-        "TXT"       -> MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
-        "XLS","XLSX"-> MaterialTheme.colorScheme.tertiary.copy(alpha = 0.2f)
-        else        -> MaterialTheme.colorScheme.surface
+        "PDF"       -> Color(0xFFE53935)
+        "DOC", "DOCX" -> Color(0xFF1E88E5)
+        "XLS", "XLSX" -> Color(0xFF43A047)
+        else        -> Color(0xFFFFB300)
     }
-    val iconTint = when (item.sizeLabel.uppercase()) {
-        "PDF"       -> MaterialTheme.colorScheme.error
-        "TXT"       -> MaterialTheme.colorScheme.primary
-        "XLS","XLSX"-> MaterialTheme.colorScheme.tertiary
-        else        -> MaterialTheme.colorScheme.onSurfaceVariant
-    }
+
+    val iconBg = typeColor.copy(alpha = 0.12f)
 
     Card(
         modifier = Modifier.fillMaxWidth().clickable { onClick() },
@@ -407,13 +555,13 @@ fun FileListItem(item: FileItem, onClick: () -> Unit, onDelete: () -> Unit) {
                 modifier = Modifier
                     .size(48.dp)
                     .clip(RoundedCornerShape(14.dp))
-                    .background(typeColor),
+                    .background(iconBg),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     Icons.Filled.Description,
                     contentDescription = "File",
-                    tint = iconTint,
+                    tint = typeColor,
                     modifier = Modifier.size(24.dp)
                 )
             }
@@ -424,17 +572,31 @@ fun FileListItem(item: FileItem, onClick: () -> Unit, onDelete: () -> Unit) {
                     fontSize = 15.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
                 Spacer(Modifier.height(2.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     if (item.sizeLabel.isNotEmpty()) {
-                        TypeBadge(item.sizeLabel)
+                        Text(
+                            text = item.sizeLabel.uppercase(),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = typeColor
+                        )
+                        Text(
+                            text = "•",
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                     if (item.dateLabel.isNotEmpty()) {
                         Text(
                             item.dateLabel,
-                            fontSize = 12.sp,
+                            fontSize = 11.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }

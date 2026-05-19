@@ -240,7 +240,9 @@ fun ToolsScreen(
     val toolState by vm.toolState.collectAsState()
     var activeTool by remember { mutableStateOf<ToolItem?>(null) }
     var selectedUris by remember { mutableStateOf<List<Uri>>(emptyList()) }
-    var multiPick by remember { mutableStateOf(false) }
+
+    var selectedTab by remember { mutableStateOf(0) }
+    val scrollState = rememberScrollState()
 
     // Single-file picker
     val singlePicker = rememberLauncherForActivityResult(
@@ -274,44 +276,274 @@ fun ToolsScreen(
     }
 
     Scaffold(containerColor = MaterialTheme.colorScheme.background) { paddingValues ->
-        Column(modifier = Modifier.padding(paddingValues).fillMaxSize()) {
-
-            // Title
-            Text(
-                text = "Tools",
-                fontSize = 28.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onBackground,
-                modifier = Modifier.padding(horizontal = 24.dp, vertical = 24.dp)
-            )
-
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(2),
-                contentPadding = PaddingValues(horizontal = 24.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+                .verticalScroll(scrollState)
+        ) {
+            // ── Top Bar Search (WPS Style) ────────────────────────────────
+            var searchQuery by remember { mutableStateOf("") }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp, vertical = 20.dp)
+                    .height(56.dp)
+                    .clip(RoundedCornerShape(28.dp))
+                    .background(MaterialTheme.colorScheme.surface),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                items(ConversionTools) { tool ->
-                    ToolCard(
-                        tool = tool,
-                        accent = accentColor(tool.accentIndex),
-                        isProcessing = toolState is ToolState.Processing && activeTool?.id == tool.id,
-                        onClick = {
-                            activeTool = tool
-                            vm.reset()
-                            val needsMulti = tool.id in listOf("merge_pdf", "img_pdf", "scan_pdf")
-                            if (needsMulti) {
-                                multiPicker.launch(tool.inputMimes)
-                            } else {
-                                singlePicker.launch(tool.inputMimes)
-                            }
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(horizontal = 16.dp).weight(1f)
+                ) {
+                    Box(modifier = Modifier.size(24.dp)) {
+                        Icon(
+                            Icons.Filled.Menu,
+                            contentDescription = "Menu",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Box(modifier = Modifier.weight(1f)) {
+                        if (searchQuery.isEmpty()) {
+                            Text(
+                                "Search files, tools…",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontSize = 15.sp
+                            )
                         }
+                        BasicTextField(
+                            value = searchQuery,
+                            onValueChange = { searchQuery = it },
+                            textStyle = TextStyle(
+                                fontSize = 15.sp,
+                                color = MaterialTheme.colorScheme.onSurface
+                            ),
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
+                        )
+                    }
+                }
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(end = 16.dp)
+                ) {
+                    // Profile Avatar (Chris)
+                    Box(
+                        modifier = Modifier
+                            .size(32.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.primary),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "C",
+                            color = MaterialTheme.colorScheme.onPrimary,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp
+                        )
+                    }
+                }
+            }
+
+            // ── Discover Tabs (AI Tools vs Other Tools) ──────────────────
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp),
+                horizontalArrangement = Arrangement.spacedBy(24.dp)
+            ) {
+                val tabs = listOf("AI Tools", "Other Tools")
+                tabs.forEachIndexed { index, title ->
+                    val active = selectedTab == index
+                    Column(
+                        modifier = Modifier.clickable { selectedTab = index },
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = title,
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        if (active) {
+                            Box(
+                                modifier = Modifier
+                                    .width(40.dp)
+                                    .height(3.dp)
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.primary)
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // ── Tab Content ───────────────────────────────────────────────
+            if (selectedTab == 0) {
+                // AI Tools List
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    AiToolItemCard(
+                        title = "AI Spell Check",
+                        subtitle = "Check document spelling & grammar in real-time.",
+                        badgeText = "NEW",
+                        badgeBg = Color(0xFF4CAF50),
+                        icon = Icons.Filled.Spellcheck,
+                        color = Color(0xFFE8F5E9)
+                    )
+                    AiToolItemCard(
+                        title = "Docs Summarizer",
+                        subtitle = "Extract a comprehensive summaries & key facts in seconds.",
+                        badgeText = "FREE",
+                        badgeBg = Color(0xFF9C27B0),
+                        icon = Icons.Filled.AutoAwesome,
+                        color = Color(0xFFF3E5F5)
+                    )
+                    AiToolItemCard(
+                        title = "Translate Doc",
+                        subtitle = "Translate your entire PDF or Word file into 40+ languages.",
+                        badgeText = "FREE",
+                        badgeBg = Color(0xFFFF9800),
+                        icon = Icons.Filled.Translate,
+                        color = Color(0xFFFFF3E0)
                     )
                 }
-                // Bottom padding for nav bar
-                item { Spacer(Modifier.height(100.dp)) }
-                item { Spacer(Modifier.height(100.dp)) }
+            } else {
+                // Other Tools / Converters Grid
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    ConversionTools.chunked(2).forEach { rowTools ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            rowTools.forEach { tool ->
+                                Box(modifier = Modifier.weight(1f)) {
+                                    ToolCard(
+                                        tool = tool,
+                                        accent = accentColor(tool.accentIndex),
+                                        isProcessing = toolState is ToolState.Processing && activeTool?.id == tool.id,
+                                        onClick = {
+                                            activeTool = tool
+                                            vm.reset()
+                                            val needsMulti = tool.id in listOf("merge_pdf", "img_pdf", "scan_pdf")
+                                            if (needsMulti) {
+                                                multiPicker.launch(tool.inputMimes)
+                                            } else {
+                                                singlePicker.launch(tool.inputMimes)
+                                            }
+                                        }
+                                    )
+                                }
+                            }
+                            if (rowTools.size == 1) {
+                                Spacer(modifier = Modifier.weight(1f))
+                            }
+                        }
+                    }
+                }
             }
+
+            Spacer(modifier = Modifier.height(32.dp))
+
+            // ── Templates Section ──────────────────────────────────────────
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Templates Gallery",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+                Text(
+                    text = "View All >",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.clickable { }
+                )
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+
+            val mockTemplates = listOf(
+                Pair("Modern Resume", Color(0xFF1E88E5)),
+                Pair("Academic Letter", Color(0xFF9C27B0)),
+                Pair("Creative Flyer", Color(0xFFFF8C00)),
+                Pair("Business Proposal", Color(0xFFE53935))
+            )
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                mockTemplates.take(2).forEach { (title, color) ->
+                    Card(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(130.dp)
+                            .clickable { },
+                        shape = RoundedCornerShape(20.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(14.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(24.dp)
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(color),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.Feed,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.weight(1f))
+                            Text(
+                                text = title,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "Free PDF/Word Template",
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(120.dp))
         }
     }
 
@@ -394,6 +626,100 @@ fun ToolCard(
 }
 
 @Composable
+fun AiToolItemCard(
+    title: String,
+    subtitle: String,
+    badgeText: String,
+    badgeBg: Color,
+    icon: ImageVector,
+    color: Color
+) {
+    var showToast by remember { mutableStateOf(false) }
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { showToast = true },
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(18.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(color),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = badgeBg,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+            Spacer(modifier = Modifier.width(16.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = title,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(badgeBg)
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = badgeText,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = subtitle,
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    lineHeight = 15.sp
+                )
+            }
+            Icon(
+                imageVector = Icons.Filled.ChevronRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                modifier = Modifier.size(20.dp)
+            )
+        }
+    }
+
+    if (showToast) {
+        AlertDialog(
+            onDismissRequest = { showToast = false },
+            containerColor = MaterialTheme.colorScheme.surface,
+            title = { Text("AI Feature Ready", fontWeight = FontWeight.Bold) },
+            text = { Text("AI spelling check and summary feature is completely unlocked. Open a PDF or Word document from the Recent/Files screen to begin using AI tools!", color = MaterialTheme.colorScheme.onSurfaceVariant) },
+            confirmButton = {
+                TextButton(onClick = { showToast = false }) {
+                    Text("Got It", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                }
+            }
+        )
+    }
+}
+
+@Composable
 private fun ResultSheetContent(
     toolState: ToolState,
     toolName: String,
@@ -405,9 +731,9 @@ private fun ResultSheetContent(
             .padding(horizontal = 32.dp, vertical = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        AnimatedVisibility(
+        androidx.compose.animation.AnimatedVisibility(
             visible = true,
-            enter = fadeIn() + slideInVertically { it / 2 }
+            enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.slideInVertically { it / 2 }
         ) {
             when (toolState) {
                 is ToolState.Done -> {
