@@ -1,37 +1,29 @@
 package com.ceo3.docs.ui.navigation
 
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.EnterTransition
-import androidx.compose.animation.ExitTransition
-import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.DocumentScanner
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Folder
-import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.outlined.FolderOpen
-import androidx.compose.material.icons.outlined.GridView
+import androidx.compose.material.icons.filled.People
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.Home
-import androidx.compose.material.icons.outlined.QrCodeScanner
+import androidx.compose.material.icons.outlined.People
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -47,16 +39,17 @@ import com.ceo3.docs.ui.screens.EditorScreen
 import com.ceo3.docs.ui.screens.FilesScreen
 import com.ceo3.docs.ui.screens.HomeScreen
 import com.ceo3.docs.ui.screens.ScannerScreen
-import com.ceo3.docs.ui.screens.ToolsScreen
-import com.ceo3.docs.ui.theme.BrandAccent
+import com.ceo3.docs.ui.screens.SharedScreen
+import com.ceo3.docs.ui.screens.SettingsScreen
 import java.net.URLDecoder
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 
 sealed class Screen(val route: String) {
     object Home    : Screen("home")
-    object Tools   : Screen("tools")
     object Files   : Screen("files")
+    object Shared  : Screen("shared")
+    object Settings: Screen("settings")
     object Editor  : Screen("editor/{docId}") {
         fun createRoute(docId: String): String {
             val encoded = URLEncoder.encode(docId, StandardCharsets.UTF_8.toString())
@@ -75,10 +68,10 @@ private data class NavItem(
 )
 
 private val navItems = listOf(
-    NavItem(Screen.Home.route,    "Home",    Icons.Filled.Home,            Icons.Outlined.Home),
-    NavItem(Screen.Tools.route,   "Tools",   Icons.Filled.GridView,        Icons.Outlined.GridView),
-    NavItem(Screen.Scanner.route, "Scan",    Icons.Filled.DocumentScanner, Icons.Outlined.QrCodeScanner),
-    NavItem(Screen.Files.route,   "Files",   Icons.Filled.Folder,          Icons.Outlined.FolderOpen)
+    NavItem(Screen.Home.route,    "Home",     Icons.Filled.Home,     Icons.Outlined.Home),
+    NavItem(Screen.Files.route,   "Files",    Icons.Filled.Folder,   Icons.Outlined.Folder),
+    NavItem(Screen.Shared.route,  "Shared",   Icons.Filled.People,   Icons.Outlined.People),
+    NavItem(Screen.Settings.route,"Settings", Icons.Filled.Settings, Icons.Outlined.Settings)
 )
 
 @Composable
@@ -101,111 +94,83 @@ fun DocsApp() {
         )
 
         if (showBottomBar) {
-            PillNavigationBar(
-                currentRoute = currentRoute,
-                navController = navController,
+            // Standard Bottom Navigation Bar matching the mockup
+            Column(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .padding(bottom = 20.dp, start = 24.dp, end = 24.dp)
-            )
-        }
-    }
-}
-
-private @Composable
-fun PillNavigationBar(
-    currentRoute: String?,
-    navController: NavHostController,
-    modifier: Modifier = Modifier
-) {
-    Box(
-        modifier = modifier
-            .shadow(
-                elevation = 24.dp,
-                shape = RoundedCornerShape(50),
-                ambientColor = BrandAccent.copy(alpha = 0.25f),
-                spotColor = BrandAccent.copy(alpha = 0.3f)
-            )
-            .clip(RoundedCornerShape(50))
-            .background(MaterialTheme.colorScheme.surface)
-            .padding(horizontal = 8.dp, vertical = 8.dp)
-    ) {
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            navItems.forEach { item ->
-                val selected = currentRoute == item.route
-                PillNavItem(
-                    item = item,
-                    selected = selected,
-                    onClick = {
-                        if (!selected) {
-                            navController.navigate(item.route) {
-                                popUpTo(navController.graph.startDestinationId) { saveState = true }
-                                launchSingleTop = true
-                                restoreState = true
+                    .fillMaxWidth()
+            ) {
+                // Subtle divider at the top of bottom nav
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
+                
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.surface)
+                        .windowInsetsPadding(WindowInsets.navigationBars)
+                        .height(64.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxSize(),
+                        horizontalArrangement = Arrangement.SpaceAround,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        navItems.forEach { item ->
+                            val selected = currentRoute == item.route
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxHeight()
+                                    .clickable {
+                                        if (!selected) {
+                                            navController.navigate(item.route) {
+                                                popUpTo(navController.graph.startDestinationId) { saveState = true }
+                                                launchSingleTop = true
+                                                restoreState = true
+                                            }
+                                        }
+                                    }
+                            ) {
+                                Icon(
+                                    imageVector = if (selected) item.selectedIcon else item.unselectedIcon,
+                                    contentDescription = item.label,
+                                    tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                                    modifier = Modifier.size(22.dp)
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = item.label,
+                                    fontSize = 11.sp,
+                                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                                    color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                )
                             }
                         }
                     }
-                )
+                }
             }
-        }
-    }
-}
 
-private @Composable
-fun PillNavItem(
-    item: NavItem,
-    selected: Boolean,
-    onClick: () -> Unit
-) {
-    val bgColor by animateColorAsState(
-        targetValue = if (selected) BrandAccent else Color.Transparent,
-        animationSpec = tween(durationMillis = 120),
-        label = "navBg"
-    )
-    val contentColor by animateColorAsState(
-        targetValue = if (selected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
-        animationSpec = tween(durationMillis = 120),
-        label = "navContent"
-    )
-    val itemWidth by animateDpAsState(
-        targetValue = if (selected) 110.dp else 56.dp,
-        animationSpec = spring(dampingRatio = 0.8f, stiffness = 1200f),
-        label = "navWidth"
-    )
-
-    Box(
-        modifier = Modifier
-            .width(itemWidth)
-            .height(44.dp)
-            .clip(CircleShape)
-            .background(bgColor)
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                onClick = onClick
-            ),
-        contentAlignment = Alignment.Center
-    ) {
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                imageVector = if (selected) item.selectedIcon else item.unselectedIcon,
-                contentDescription = item.label,
-                tint = contentColor,
-                modifier = Modifier.size(20.dp)
-            )
-            if (selected) {
-                Text(
-                    text = item.label,
-                    color = contentColor,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1
+            // Mockup Floating Action Button (+) floating above bottom navigation on the right side
+            FloatingActionButton(
+                onClick = {
+                    // Quick Action: Create a Blank Document
+                    navController.navigate(Screen.Editor.createRoute("new_blank_document"))
+                },
+                shape = CircleShape,
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = Color.White,
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(bottom = 80.dp, end = 20.dp)
+                    .size(56.dp)
+                    .shadow(8.dp, CircleShape)
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Add,
+                    contentDescription = "New Document",
+                    modifier = Modifier.size(26.dp)
                 )
             }
         }
@@ -217,11 +182,7 @@ fun DocsNavHost(navController: NavHostController, modifier: Modifier = Modifier)
     NavHost(
         navController = navController,
         startDestination = Screen.Home.route,
-        modifier = modifier,
-        enterTransition = { EnterTransition.None },
-        exitTransition = { ExitTransition.None },
-        popEnterTransition = { EnterTransition.None },
-        popExitTransition = { ExitTransition.None }
+        modifier = modifier
     ) {
         composable(Screen.Home.route) {
             HomeScreen(
@@ -230,17 +191,18 @@ fun DocsNavHost(navController: NavHostController, modifier: Modifier = Modifier)
                 onNavigateToDonate  = { navController.navigate(Screen.Donate.route) }
             )
         }
-        composable(Screen.Tools.route) {
-            ToolsScreen(
-                onNavigateToScanner = { navController.navigate(Screen.Scanner.route) },
-                onNavigateToEditor  = { docId -> navController.navigate(Screen.Editor.createRoute(docId)) },
-                onNavigateToDonate  = { navController.navigate(Screen.Donate.route) }
-            )
-        }
         composable(Screen.Files.route) {
             FilesScreen(
                 onDocumentClick = { docId -> navController.navigate(Screen.Editor.createRoute(docId)) }
             )
+        }
+        composable(Screen.Shared.route) {
+            SharedScreen(
+                onDocumentClick = { docId -> navController.navigate(Screen.Editor.createRoute(docId)) }
+            )
+        }
+        composable(Screen.Settings.route) {
+            SettingsScreen()
         }
         composable(Screen.Editor.route) { backStackEntry ->
             val encodedDocId = backStackEntry.arguments?.getString("docId") ?: ""

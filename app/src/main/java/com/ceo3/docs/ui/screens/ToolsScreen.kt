@@ -1145,6 +1145,37 @@ fun ToolsScreen(
     // Chat room input
     var chatQueryInput by remember { mutableStateOf("") }
 
+    fun copyUriToCache(context: android.content.Context, uri: Uri): String? {
+        return try {
+            val cursor = context.contentResolver.query(uri, null, null, null, null)
+            var name: String? = null
+            cursor?.use {
+                if (it.moveToFirst()) {
+                    val index = it.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                    if (index != -1) name = it.getString(index)
+                }
+            }
+            if (name == null) {
+                name = uri.path
+                val cut = name?.lastIndexOf('/') ?: -1
+                if (cut != -1) {
+                    name = name?.substring(cut + 1)
+                }
+            }
+            val fileName = name ?: "temp_pdf_tool.pdf"
+            val extension = fileName.substringAfterLast(".", "pdf").lowercase()
+            val cacheFile = File(context.cacheDir, "temp_tool_import_${System.currentTimeMillis()}.$extension")
+            context.contentResolver.openInputStream(uri)?.use { input ->
+                FileOutputStream(cacheFile).use { output ->
+                    input.copyTo(output)
+                }
+            }
+            cacheFile.absolutePath
+        } catch (e: Exception) {
+            null
+        }
+    }
+
     val imageTranslatePicker = rememberLauncherForActivityResult(
         ActivityResultContracts.GetContent()
     ) { uri ->
@@ -1176,8 +1207,11 @@ fun ToolsScreen(
         ActivityResultContracts.GetContent()
     ) { uri ->
         uri?.let {
-            viewModel.loadFileContentForTool(it) {
-                activeToolName = "Docs Summarize"
+            val cachedPath = copyUriToCache(context, it)
+            if (cachedPath != null) {
+                onNavigateToEditor(cachedPath + "::Docs Summarize")
+            } else {
+                Toast.makeText(context, "Failed to load document", Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -1186,8 +1220,11 @@ fun ToolsScreen(
         ActivityResultContracts.GetContent()
     ) { uri ->
         uri?.let {
-            viewModel.loadFileContentForTool(it) {
-                activeToolName = "Chat PDF"
+            val cachedPath = copyUriToCache(context, it)
+            if (cachedPath != null) {
+                onNavigateToEditor(cachedPath + "::Chat PDF")
+            } else {
+                Toast.makeText(context, "Failed to load document", Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -1269,7 +1306,14 @@ fun ToolsScreen(
     val pdfExportPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
-        uri?.let { viewModel.exportPdfToImages(it) }
+        uri?.let {
+            val cachedPath = copyUriToCache(context, it)
+            if (cachedPath != null) {
+                onNavigateToEditor(cachedPath + "::Export PDF pages")
+            } else {
+                Toast.makeText(context, "Failed to load document", Toast.LENGTH_SHORT).show()
+            }
+        }
     }
 
     val imageEnhancePicker = rememberLauncherForActivityResult(
@@ -1281,7 +1325,14 @@ fun ToolsScreen(
     val readAloudPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
-        uri?.let { viewModel.selectFileAndReadAloud(it) }
+        uri?.let {
+            val cachedPath = copyUriToCache(context, it)
+            if (cachedPath != null) {
+                onNavigateToEditor(cachedPath + "::Read Aloud")
+            } else {
+                Toast.makeText(context, "Failed to load document", Toast.LENGTH_SHORT).show()
+            }
+        }
     }
 
     // Stop speaking when navigating away
