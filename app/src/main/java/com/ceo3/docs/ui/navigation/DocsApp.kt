@@ -9,13 +9,12 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.Home
-import androidx.compose.material.icons.outlined.People
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -91,7 +90,7 @@ private data class NavItem(
 private val navItems = listOf(
     NavItem(Screen.Home.route,    "Home",     Icons.Filled.Home,     Icons.Outlined.Home),
     NavItem(Screen.Files.route,   "Files",    Icons.Filled.Folder,   Icons.Outlined.Folder),
-    NavItem(Screen.Shared.route,  "Shared",   Icons.Filled.People,   Icons.Outlined.People),
+    NavItem(Screen.Tools.route,   "Tools",    Icons.Filled.Build,    Icons.Filled.Build),
     NavItem(Screen.Settings.route,"Settings", Icons.Filled.Settings, Icons.Outlined.Settings)
 )
 
