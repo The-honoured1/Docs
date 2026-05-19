@@ -492,7 +492,7 @@ fun HomeScreen(
                         ) {
                             QuickActionCard(
                                 title = "New Doc",
-                                description = "Blank doc or templates",
+                                description = "Create blank document",
                                 icon = Icons.Filled.Add,
                                 iconBg = Color(0xFFE8F0FE),
                                 iconTint = Color(0xFF1A73E8),
@@ -734,6 +734,7 @@ fun QuickActionCard(
 ) {
     Row(
         modifier = modifier
+            .height(76.dp)
             .clip(RoundedCornerShape(16.dp))
             .background(MaterialTheme.colorScheme.surface)
             .border(

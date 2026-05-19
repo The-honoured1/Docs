@@ -45,8 +45,6 @@ import com.ceo3.docs.ui.screens.HomeScreen
 import com.ceo3.docs.ui.screens.ScannerScreen
 import com.ceo3.docs.ui.screens.SharedScreen
 import com.ceo3.docs.ui.screens.SettingsScreen
-import com.ceo3.docs.ui.screens.ToolsScreen
-import com.ceo3.docs.ui.screens.TemplatesScreen
 import com.ceo3.docs.ui.screens.AccountSettingsScreen
 import com.ceo3.docs.ui.screens.CloudSyncBackupScreen
 import com.ceo3.docs.ui.screens.ThemeSettingsScreen
@@ -74,7 +72,6 @@ sealed class Screen(val route: String) {
     object Scanner : Screen("scanner")
     object Donate  : Screen("donate")
     object Tools    : Screen("tools")
-    object Templates: Screen("templates")
     object AccountSettings : Screen("settings/account")
     object CloudSyncBackup : Screen("settings/cloud")
     object ThemeSettings   : Screen("settings/theme")
@@ -209,9 +206,9 @@ fun DocsApp(settingsManager: SettingsManager? = null) {
                                     .clickable {
                                         if (!selected) {
                                             navController.navigate(item.route) {
-                                                popUpTo(navController.graph.startDestinationId) { saveState = true }
+                                                popUpTo(navController.graph.startDestinationId) { saveState = false }
                                                 launchSingleTop = true
-                                                restoreState = true
+                                                restoreState = false
                                             }
                                         }
                                     }
@@ -238,8 +235,8 @@ fun DocsApp(settingsManager: SettingsManager? = null) {
             // Mockup Floating Action Button (+) floating above bottom navigation on the right side
             FloatingActionButton(
                 onClick = {
-                    // Navigate to Template Library / Create Doc screen
-                    navController.navigate(Screen.Templates.route)
+                    // Navigate directly to blank new document editor
+                    navController.navigate(Screen.Editor.createRoute("new_blank_document"))
                 },
                 shape = CircleShape,
                 containerColor = MaterialTheme.colorScheme.primary,
@@ -267,26 +264,42 @@ fun DocsNavHost(navController: NavHostController, settingsManager: SettingsManag
         startDestination = Screen.Home.route,
         modifier = modifier
     ) {
-        composable(Screen.Home.route) {
+        composable(
+            route = Screen.Home.route,
+            enterTransition = { fadeIn(animationSpec = tween(120)) },
+            exitTransition = { fadeOut(animationSpec = tween(120)) }
+        ) {
             HomeScreen(
                 onNavigateToEditor    = { docId -> navController.navigate(Screen.Editor.createRoute(docId)) },
                 onNavigateToScanner   = { navController.navigate(Screen.Scanner.route) },
                 onNavigateToDonate    = { navController.navigate(Screen.Donate.route) },
-                onNavigateToTemplates = { navController.navigate(Screen.Templates.route) },
+                onNavigateToTemplates = { navController.navigate(Screen.Editor.createRoute("new_blank_document")) },
                 onNavigateToTools     = { navController.navigate(Screen.Tools.route) }
             )
         }
-        composable(Screen.Files.route) {
+        composable(
+            route = Screen.Files.route,
+            enterTransition = { fadeIn(animationSpec = tween(120)) },
+            exitTransition = { fadeOut(animationSpec = tween(120)) }
+        ) {
             FilesScreen(
                 onDocumentClick = { docId -> navController.navigate(Screen.Editor.createRoute(docId)) }
             )
         }
-        composable(Screen.Shared.route) {
+        composable(
+            route = Screen.Shared.route,
+            enterTransition = { fadeIn(animationSpec = tween(120)) },
+            exitTransition = { fadeOut(animationSpec = tween(120)) }
+        ) {
             SharedScreen(
                 onDocumentClick = { docId -> navController.navigate(Screen.Editor.createRoute(docId)) }
             )
         }
-        composable(Screen.Settings.route) {
+        composable(
+            route = Screen.Settings.route,
+            enterTransition = { fadeIn(animationSpec = tween(120)) },
+            exitTransition = { fadeOut(animationSpec = tween(120)) }
+        ) {
             SettingsScreen(
                 onNavigateToDonate = { navController.navigate(Screen.Donate.route) },
                 onNavigateToTools  = { navController.navigate(Screen.Tools.route) },
@@ -321,17 +334,15 @@ fun DocsNavHost(navController: NavHostController, settingsManager: SettingsManag
                 onNavigateBack = { navController.popBackStack() }
             )
         }
-        composable(Screen.Tools.route) {
+        composable(
+            route = Screen.Tools.route,
+            enterTransition = { fadeIn(animationSpec = tween(120)) },
+            exitTransition = { fadeOut(animationSpec = tween(120)) }
+        ) {
             ToolsScreen(
                 onNavigateToScanner = { navController.navigate(Screen.Scanner.route) },
                 onNavigateToEditor  = { docId -> navController.navigate(Screen.Editor.createRoute(docId)) },
                 onNavigateToDonate  = { navController.navigate(Screen.Donate.route) }
-            )
-        }
-        composable(Screen.Templates.route) {
-            TemplatesScreen(
-                onNavigateToEditor = { docId -> navController.navigate(Screen.Editor.createRoute(docId)) },
-                onNavigateBack     = { navController.popBackStack() }
             )
         }
         composable(Screen.AccountSettings.route) {

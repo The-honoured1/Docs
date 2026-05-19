@@ -1,6 +1,15 @@
 package com.ceo3.docs.ui.screens
 
 import android.widget.Toast
+import android.os.Build
+import android.os.Environment
+import android.provider.Settings
+import android.content.Intent
+import android.net.Uri
+import android.Manifest
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -121,11 +130,24 @@ fun FilesScreen(
     var selectedTab by remember { mutableStateOf(0) }
     val tabs = listOf("All", "Folders", "Documents")
 
+    var showPermissionExplanationDialog by remember { mutableStateOf(false) }
+
+    val legacyPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            scanAndImportFromDownloads(context, viewModel)
+        } else {
+            Toast.makeText(context, "Storage permission is required to read Downloads folder.", Toast.LENGTH_SHORT).show()
+        }
+    }
+
     val foldersList = listOf(
         FolderItem("Work", Color(0xFFF59E0B), 12, isShared = true, isStarred = true),
         FolderItem("Personal", Color(0xFF10B981), 8),
         FolderItem("Clients", Color(0xFF8B5CF6), 6, isShared = true),
-        FolderItem("Archive", Color(0xFF6B7280), 20)
+        FolderItem("Archive", Color(0xFF6B7280), 20),
+        FolderItem("Downloads", Color(0xFF3B82F6), 0)
     )
 
     val tagsList = listOf(
@@ -232,35 +254,43 @@ fun FilesScreen(
                     }
                 }
 
-                item {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        foldersList.take(2).forEach { folder ->
-                            val isSelected = state.selectedFolder == folder.name
-                            FolderGridItem(
-                                item = folder,
-                                isSelected = isSelected,
-                                modifier = Modifier.weight(1f),
-                                onClick = { viewModel.selectFolder(folder.name) }
-                            )
-                        }
-                    }
-                }
-                item {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        foldersList.drop(2).take(2).forEach { folder ->
-                            val isSelected = state.selectedFolder == folder.name
-                            FolderGridItem(
-                                item = folder,
-                                isSelected = isSelected,
-                                modifier = Modifier.weight(1f),
-                                onClick = { viewModel.selectFolder(folder.name) }
-                            )
+                foldersList.chunked(2).forEach { rowFolders ->
+                    item {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            rowFolders.forEach { folder ->
+                                val isSelected = state.selectedFolder == folder.name
+                                FolderGridItem(
+                                    item = folder,
+                                    isSelected = isSelected,
+                                    modifier = Modifier.weight(1f),
+                                    onClick = {
+                                        if (folder.name == "Downloads") {
+                                            val hasManagePermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                                                Environment.isExternalStorageManager()
+                                            } else {
+                                                ContextCompat.checkSelfPermission(
+                                                    context,
+                                                    Manifest.permission.READ_EXTERNAL_STORAGE
+                                                ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                                            }
+
+                                            if (hasManagePermission) {
+                                                scanAndImportFromDownloads(context, viewModel)
+                                            } else {
+                                                showPermissionExplanationDialog = true
+                                            }
+                                        } else {
+                                            viewModel.selectFolder(folder.name)
+                                        }
+                                    }
+                                )
+                            }
+                            if (rowFolders.size == 1) {
+                                Spacer(modifier = Modifier.weight(1f))
+                            }
                         }
                     }
                 }
@@ -357,7 +387,58 @@ fun FilesScreen(
                         )
                     }
                 }
-            }
+        if (showPermissionExplanationDialog) {
+            AlertDialog(
+                onDismissRequest = { showPermissionExplanationDialog = false },
+                title = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            Icons.Filled.FolderSpecial,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(28.dp)
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text("Access Phone Downloads", fontWeight = FontWeight.Bold)
+                    }
+                },
+                text = {
+                    Text(
+                        "To view, import, and manage offline PDFs, presentation slides, and documents from your device's Downloads directory and local storage, the app requires 'All Files Access' permission.",
+                        fontSize = 13.sp,
+                        lineHeight = 18.sp
+                    )
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            showPermissionExplanationDialog = false
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                                try {
+                                    val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
+                                        data = Uri.parse("package:${context.packageName}")
+                                    }
+                                    context.startActivity(intent)
+                                } catch (e: Exception) {
+                                    val intent = Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)
+                                    context.startActivity(intent)
+                                }
+                            } else {
+                                legacyPermissionLauncher.launch(Manifest.permission.READ_EXTERNAL_STORAGE)
+                            }
+                        },
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text("Grant Permission", fontWeight = FontWeight.Bold)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showPermissionExplanationDialog = false }) {
+                        Text("Cancel")
+                    }
+                },
+                shape = RoundedCornerShape(24.dp)
+            )
         }
     }
 }
@@ -577,3 +658,62 @@ fun FileRowItem(
         }
     }
 }
+
+fun scanAndImportFromDownloads(context: android.content.Context, viewModel: FilesViewModel) {
+    val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+    if (downloadsDir.exists() && downloadsDir.isDirectory) {
+        val files = downloadsDir.listFiles() ?: emptyArray()
+        val supportedExtensions = listOf("pdf", "docx", "doc", "xlsx", "xls", "pptx", "ppt", "png", "jpg", "jpeg")
+        
+        viewModel.viewModelScope.launch(Dispatchers.IO) {
+            var importedCount = 0
+            val dao = com.ceo3.docs.data.local.DocDatabase.getDatabase(context).documentDao()
+            files.forEach { file ->
+                val ext = file.extension.lowercase()
+                if (file.isFile && ext in supportedExtensions) {
+                    val docName = file.name
+                    val cleanId = "download_${file.nameWithoutExtension}"
+                    val existing = dao.getDocumentById(cleanId)
+                    if (existing == null) {
+                        try {
+                            val destFile = java.io.File(context.filesDir, "doc_${cleanId}.${ext}")
+                            file.inputStream().use { input ->
+                                destFile.outputStream().use { output ->
+                                    input.copyTo(output)
+                                }
+                            }
+                            
+                            val doc = DocumentEntity(
+                                id = cleanId,
+                                title = docName,
+                                type = ext.uppercase(),
+                                lastModified = file.lastModified(),
+                                isPinned = false,
+                                tags = "Downloads,Imported",
+                                accentTheme = "classic",
+                                accentColor = "blue"
+                            )
+                            dao.insertDocument(doc)
+                            importedCount++
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                        }
+                    }
+                }
+            }
+            
+            // Switch back to Main thread for visual feedback
+            kotlinx.coroutines.withContext(Dispatchers.Main) {
+                if (importedCount > 0) {
+                    Toast.makeText(context, "Imported $importedCount new files from phone Downloads!", Toast.LENGTH_LONG).show()
+                } else {
+                    Toast.makeText(context, "No new documents found in phone Downloads.", Toast.LENGTH_SHORT).show()
+                }
+                viewModel.selectFolder("Downloads")
+            }
+        }
+    } else {
+        Toast.makeText(context, "Downloads folder not accessible.", Toast.LENGTH_SHORT).show()
+    }
+}
+
