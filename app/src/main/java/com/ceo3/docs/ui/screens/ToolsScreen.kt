@@ -57,6 +57,19 @@ import java.io.File
 import java.io.FileOutputStream
 import java.util.Locale
 import java.util.UUID
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.foundation.Canvas as ComposeCanvas
+import androidx.compose.ui.graphics.Path as ComposePath
+import androidx.compose.material3.Slider
+import androidx.compose.ui.graphics.toArgb
 
 // Represents a tool item in the grid
 data class ToolItem(
@@ -90,9 +103,6 @@ data class ToolsUiState(
     val processingMessage: String = "",
     val completionMessage: String? = null
 )
-
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.toArgb
 
 class ToolsViewModel(application: android.app.Application) : AndroidViewModel(application), TextToSpeech.OnInitListener {
     private val _uiState = MutableStateFlow(ToolsUiState())
@@ -1020,6 +1030,111 @@ fun ToolsScreen(
     val state by viewModel.uiState.collectAsState()
     val context = LocalContext.current
 
+    val scope = rememberCoroutineScope()
+    val ocrEngine = remember { OcrEngine() }
+    var activeToolName by remember { mutableStateOf("") }
+    var spellCheckInputText by remember { mutableStateOf("") }
+    var spellCheckMistakes by remember { mutableStateOf<List<Pair<String, String>>>(emptyList()) }
+    var translationTargetLang by remember { mutableStateOf("Spanish") }
+    var translationOutputText by remember { mutableStateOf("") }
+
+    // Smart Eraser Canvas Overlay drawing paths
+    var eraserImageUri by remember { mutableStateOf<Uri?>(null) }
+    val erasedStrokes = remember { mutableStateListOf<List<Offset>>() }
+    val currentStroke = remember { mutableStateListOf<Offset>() }
+    var brushWidth by remember { mutableStateOf(30f) }
+
+    // Chat room input
+    var chatQueryInput by remember { mutableStateOf("") }
+
+    val imageTranslatePicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.GetContent()
+    ) { uri ->
+        uri?.let {
+            scope.launch(Dispatchers.IO) {
+                try {
+                    val bitmap = context.contentResolver.openInputStream(it)?.use { stream ->
+                        BitmapFactory.decodeStream(stream)
+                    }
+                    if (bitmap != null) {
+                        val res = ocrEngine.extractTextFromImage(bitmap)
+                        if (res.isSuccess) {
+                            withContext(Dispatchers.Main) {
+                                spellCheckInputText = res.getOrThrow()
+                                activeToolName = "AI Translate"
+                            }
+                        }
+                    }
+                } catch (e: Exception) {
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(context, "Image OCR failed: ${e.message}", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+        }
+    }
+
+    val summarizePicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.GetContent()
+    ) { uri ->
+        uri?.let {
+            viewModel.loadFileContentForTool(it) {
+                activeToolName = "Docs Summarize"
+            }
+        }
+    }
+
+    val chatPdfPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.GetContent()
+    ) { uri ->
+        uri?.let {
+            viewModel.loadFileContentForTool(it) {
+                activeToolName = "Chat PDF"
+            }
+        }
+    }
+
+    val bgRemovalPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.GetContent()
+    ) { uri ->
+        uri?.let {
+            viewModel.processBgRemoval(it) { docId ->
+                Toast.makeText(context, "Background removed and saved successfully!", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    val imageExcelPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.GetContent()
+    ) { uri ->
+        uri?.let {
+            viewModel.processImageToExcel(it) { docId ->
+                Toast.makeText(context, "Excel sheet generated and saved successfully!", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    val imagePptPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.GetContent()
+    ) { uri ->
+        uri?.let {
+            viewModel.processImageToPpt(it) { docId ->
+                Toast.makeText(context, "PowerPoint slides generated successfully!", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    val smartEraserPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.GetContent()
+    ) { uri ->
+        uri?.let {
+            eraserImageUri = it
+            erasedStrokes.clear()
+            currentStroke.clear()
+            activeToolName = "Smart Eraser"
+        }
+    }
+
     // Set up real launch pickers for different real actions
     val imageToPdfPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetMultipleContents()
@@ -1248,26 +1363,58 @@ fun ToolsScreen(
                                         modifier = Modifier
                                             .weight(1f)
                                             .clickable {
-                                                when (tool.actionType) {
-                                                    ToolActionType.SCANNER -> onNavigateToScanner()
-                                                    ToolActionType.IMAGE_TO_PDF -> imageToPdfPicker.launch("image/*")
-                                                    ToolActionType.IMAGE_TO_TEXT -> imageToTextPicker.launch("image/*")
-                                                    ToolActionType.SUPPORT -> onNavigateToDonate()
-                                                    ToolActionType.COMPRESS_IMAGE -> imageCompressPicker.launch("image/*")
-                                                    ToolActionType.CONVERT_FORMAT -> formatConvertPicker.launch("image/*")
-                                                    ToolActionType.EXPORT_PDF_IMAGES -> pdfExportPicker.launch("application/pdf")
-                                                    ToolActionType.ENHANCE_IMAGE -> imageEnhancePicker.launch("image/*")
-                                                    ToolActionType.READ_ALOUD -> readAloudPicker.launch("*/*")
-                                                    ToolActionType.SIMULATED_AI -> viewModel.runSimulatedTool(
-                                                        tool.name,
-                                                        "Analyzing document using local models...",
-                                                        "AI execution completed! Changes applied."
-                                                    )
-                                                    ToolActionType.SIMULATED_IMAGE -> viewModel.runSimulatedTool(
-                                                        tool.name,
-                                                        "Enhancing photo pixels...",
-                                                        "Image filter applied successfully!"
-                                                    )
+                                                when (tool.name) {
+                                                    "AI Spell Check" -> {
+                                                        activeToolName = "AI Spell Check"
+                                                        spellCheckInputText = ""
+                                                        spellCheckMistakes = emptyList()
+                                                    }
+                                                    "AI Translate" -> {
+                                                        activeToolName = "AI Translate"
+                                                        spellCheckInputText = ""
+                                                        translationOutputText = ""
+                                                    }
+                                                    "Image Translate" -> {
+                                                        imageTranslatePicker.launch("image/*")
+                                                    }
+                                                    "Docs Summarize" -> {
+                                                        summarizePicker.launch("*/*")
+                                                    }
+                                                    "Chat PDF" -> {
+                                                        chatPdfPicker.launch("*/*")
+                                                    }
+                                                    "BG Removal" -> {
+                                                        bgRemovalPicker.launch("image/*")
+                                                    }
+                                                    "Image to Excel" -> {
+                                                        imageExcelPicker.launch("image/*")
+                                                    }
+                                                    "Image to PPT" -> {
+                                                        imagePptPicker.launch("image/*")
+                                                    }
+                                                    "Smart Eraser" -> {
+                                                        smartEraserPicker.launch("image/*")
+                                                    }
+                                                    else -> {
+                                                        when (tool.actionType) {
+                                                            ToolActionType.SCANNER -> onNavigateToScanner()
+                                                            ToolActionType.IMAGE_TO_PDF -> imageToPdfPicker.launch("image/*")
+                                                            ToolActionType.IMAGE_TO_TEXT -> imageToTextPicker.launch("image/*")
+                                                            ToolActionType.SUPPORT -> onNavigateToDonate()
+                                                            ToolActionType.COMPRESS_IMAGE -> imageCompressPicker.launch("image/*")
+                                                            ToolActionType.CONVERT_FORMAT -> formatConvertPicker.launch("image/*")
+                                                            ToolActionType.EXPORT_PDF_IMAGES -> pdfExportPicker.launch("application/pdf")
+                                                            ToolActionType.ENHANCE_IMAGE -> imageEnhancePicker.launch("image/*")
+                                                            ToolActionType.READ_ALOUD -> readAloudPicker.launch("*/*")
+                                                            else -> {
+                                                                viewModel.runSimulatedTool(
+                                                                    tool.name,
+                                                                    "Analyzing document using local models...",
+                                                                    "AI execution completed! Changes applied."
+                                                                )
+                                                            }
+                                                        }
+                                                    }
                                                 }
                                             },
                                         contentAlignment = Alignment.Center
@@ -1402,6 +1549,358 @@ fun ToolsScreen(
             text = { Text(completeMsg) },
             shape = RoundedCornerShape(24.dp),
             containerColor = MaterialTheme.colorScheme.surface
+        )
+    }
+
+    // A. AI Spell Check Dialog
+    if (activeToolName == "AI Spell Check") {
+        AlertDialog(
+            onDismissRequest = { activeToolName = "" },
+            title = { Text("AI Spell Check", fontWeight = FontWeight.Bold) },
+            text = {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    OutlinedTextField(
+                        value = spellCheckInputText,
+                        onValueChange = { spellCheckInputText = it },
+                        label = { Text("Enter text to spellcheck") },
+                        modifier = Modifier.fillMaxWidth().height(150.dp),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Button(
+                        onClick = {
+                            spellCheckMistakes = viewModel.checkLocalSpelling(spellCheckInputText)
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text("Check Spelling")
+                    }
+                    if (spellCheckMistakes.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text("Suggestions:", fontWeight = FontWeight.Bold)
+                        LazyColumn(modifier = Modifier.height(120.dp).padding(top = 4.dp)) {
+                            items(spellCheckMistakes) { (typo, correction) ->
+                                Card(
+                                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                                    shape = RoundedCornerShape(8.dp)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth().padding(8.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text("Found '$typo' -> '$correction'")
+                                        TextButton(onClick = {
+                                            spellCheckInputText = spellCheckInputText.replace(typo, correction, ignoreCase = true)
+                                            spellCheckMistakes = viewModel.checkLocalSpelling(spellCheckInputText)
+                                        }) {
+                                            Text("Apply")
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    } else if (spellCheckInputText.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text("No spelling issues found!", color = Color(0xFF4CAF50), fontWeight = FontWeight.Bold)
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { activeToolName = "" }) {
+                    Text("Close")
+                }
+            }
+        )
+    }
+
+    // B. AI Translate Dialog
+    if (activeToolName == "AI Translate") {
+        AlertDialog(
+            onDismissRequest = { activeToolName = "" },
+            title = { Text("AI Translate", fontWeight = FontWeight.Bold) },
+            text = {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    OutlinedTextField(
+                        value = spellCheckInputText,
+                        onValueChange = { spellCheckInputText = it },
+                        label = { Text("Enter English text") },
+                        modifier = Modifier.fillMaxWidth().height(100.dp),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text("Target Language:", fontWeight = FontWeight.SemiBold)
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        listOf("Spanish", "French", "German").forEach { lang ->
+                            val isSel = translationTargetLang == lang
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(if (isSel) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant)
+                                    .clickable { translationTargetLang = lang }
+                                    .padding(vertical = 8.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(lang, color = if (isSel) Color.White else MaterialTheme.colorScheme.onSurface)
+                            }
+                        }
+                    }
+                    Button(
+                        onClick = {
+                            translationOutputText = viewModel.translateLocalText(spellCheckInputText, translationTargetLang)
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text("Translate")
+                    }
+                    if (translationOutputText.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text("Translation:", fontWeight = FontWeight.Bold)
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp))
+                                .padding(12.dp)
+                        ) {
+                            Text(translationOutputText)
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { activeToolName = "" }) {
+                    Text("Close")
+                }
+            }
+        )
+    }
+
+    // C. Docs Summarize Dialog
+    if (activeToolName == "Docs Summarize") {
+        AlertDialog(
+            onDismissRequest = { activeToolName = "" },
+            title = { Text("Extractive Summarizer", fontWeight = FontWeight.Bold) },
+            text = {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Text("Loaded: ${viewModel.selectedFileName.value}", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                    Spacer(modifier = Modifier.height(12.dp))
+                    val summary = remember(viewModel.selectedFileText.value) {
+                        viewModel.summarizeText(viewModel.selectedFileText.value)
+                    }
+                    Text("Document Summary:", fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(200.dp)
+                            .verticalScroll(rememberScrollState())
+                            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(12.dp))
+                            .padding(12.dp)
+                    ) {
+                        Text(summary, lineHeight = 20.sp)
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { activeToolName = "" }) {
+                    Text("Close")
+                }
+            }
+        )
+    }
+
+    // D. Chat PDF Dialog
+    if (activeToolName == "Chat PDF") {
+        AlertDialog(
+            onDismissRequest = { activeToolName = "" },
+            title = { Text("Chat PDF Workspace", fontWeight = FontWeight.Bold) },
+            text = {
+                Column(modifier = Modifier.fillMaxWidth().height(400.dp)) {
+                    Text("Document: ${viewModel.selectedFileName.value}", fontSize = 12.sp, color = Color.Gray)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    LazyColumn(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth()
+                            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(12.dp))
+                            .padding(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(viewModel.chatMessages) { (sender, msg) ->
+                            Column(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalAlignment = if (sender == "User") Alignment.End else Alignment.Start
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(if (sender == "User") MaterialTheme.colorScheme.primary else Color.White)
+                                        .padding(10.dp)
+                                ) {
+                                    Text(
+                                        text = msg,
+                                        color = if (sender == "User") Color.White else Color.Black,
+                                        fontSize = 13.sp
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OutlinedTextField(
+                            value = chatQueryInput,
+                            onValueChange = { chatQueryInput = it },
+                            label = { Text("Ask a question...") },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        IconButton(
+                            onClick = {
+                                viewModel.askChatPdf(chatQueryInput)
+                                chatQueryInput = ""
+                            }
+                        ) {
+                            Icon(Icons.Filled.Send, contentDescription = "Send", tint = MaterialTheme.colorScheme.primary)
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { activeToolName = "" }) {
+                    Text("Close")
+                }
+            }
+        )
+    }
+
+    // E. Smart Eraser Overlay Dialog
+    if (activeToolName == "Smart Eraser" && eraserImageUri != null) {
+        val eraserBmp = remember(eraserImageUri) {
+            try {
+                context.contentResolver.openInputStream(eraserImageUri!!)?.use { stream ->
+                    BitmapFactory.decodeStream(stream)
+                }
+            } catch (e: Exception) {
+                null
+            }
+        }
+
+        AlertDialog(
+            onDismissRequest = { activeToolName = "" },
+            title = { Text("Smart Eraser Workbench", fontWeight = FontWeight.Bold) },
+            text = {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Text("Sweep or drag on the image to erase features to white.", fontSize = 12.sp, color = Color.Gray)
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(280.dp)
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(Color.LightGray),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (eraserBmp != null) {
+                            Image(
+                                bitmap = eraserBmp.asImageBitmap(),
+                                contentDescription = "Source Image",
+                                modifier = Modifier.fillMaxSize()
+                            )
+                            ComposeCanvas(
+                                modifier = Modifier
+                                    .matchParentSize()
+                                    .pointerInput(Unit) {
+                                        detectDragGestures(
+                                            onDragStart = { offset ->
+                                                currentStroke.clear()
+                                                currentStroke.add(offset)
+                                            },
+                                            onDragEnd = {
+                                                if (currentStroke.size > 1) {
+                                                    erasedStrokes.add(currentStroke.toList())
+                                                }
+                                                currentStroke.clear()
+                                            },
+                                            onDragCancel = {
+                                                currentStroke.clear()
+                                            },
+                                            onDrag = { change, dragAmount ->
+                                                change.consume()
+                                                currentStroke.add(change.position)
+                                            }
+                                        )
+                                    }
+                            ) {
+                                erasedStrokes.forEach { stroke ->
+                                    if (stroke.size > 1) {
+                                        val path = ComposePath()
+                                        path.moveTo(stroke[0].x, stroke[0].y)
+                                        for (i in 1 until stroke.size) {
+                                            path.lineTo(stroke[i].x, stroke[i].y)
+                                        }
+                                        drawPath(path = path, color = Color.White, style = Stroke(width = brushWidth))
+                                    }
+                                }
+                                if (currentStroke.size > 1) {
+                                    val path = ComposePath()
+                                    path.moveTo(currentStroke[0].x, currentStroke[0].y)
+                                    for (i in 1 until currentStroke.size) {
+                                        path.lineTo(currentStroke[i].x, currentStroke[i].y)
+                                    }
+                                    drawPath(path = path, color = Color.White, style = Stroke(width = brushWidth))
+                                }
+                            }
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        TextButton(onClick = { erasedStrokes.clear() }) {
+                            Text("Clear all strokes", color = MaterialTheme.colorScheme.error)
+                        }
+                        Slider(
+                            value = brushWidth,
+                            onValueChange = { brushWidth = it },
+                            valueRange = 10f..100f,
+                            modifier = Modifier.width(150.dp)
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                Row {
+                    TextButton(onClick = { activeToolName = "" }) {
+                        Text("Cancel")
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Button(
+                        onClick = {
+                            viewModel.saveErasedImage(eraserImageUri!!, erasedStrokes.toList(), brushWidth) {
+                                Toast.makeText(context, "Image cleaned & saved to files successfully!", Toast.LENGTH_LONG).show()
+                                activeToolName = ""
+                            }
+                        },
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text("Save Clean Image")
+                    }
+                }
+            }
         )
     }
 }

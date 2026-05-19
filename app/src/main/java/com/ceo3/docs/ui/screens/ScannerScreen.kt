@@ -15,6 +15,8 @@ import androidx.camera.core.*
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.animation.*
+import androidx.compose.animation.core.*
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -322,6 +324,14 @@ fun ScannerScreen(
         camera?.cameraControl?.enableTorch(flashEnabled)
     }
 
+    // AI Bounding Box tracking states
+    var detectedRect by remember { mutableStateOf<android.graphics.Rect?>(null) }
+    var frameWidth by remember { mutableStateOf(0) }
+    var frameHeight by remember { mutableStateOf(0) }
+    var frameRotation by remember { mutableStateOf(0) }
+
+    val infiniteTransition = rememberInfiniteTransition(label = "scannerPulse")
+
     Scaffold(containerColor = Color.Black) { paddingValues ->
         Box(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
             if (hasPermission) {
@@ -339,13 +349,68 @@ fun ScannerScreen(
                             imageCapture = ImageCapture.Builder()
                                 .setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)
                                 .build()
+
+                            // ImageAnalysis usecase for ML Kit real-time auto-select document tracking!
+                            val imageAnalysis = ImageAnalysis.Builder()
+                                .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                                .build()
+
+                            var lastAnalysisTime = 0L
+                            val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+
+                            imageAnalysis.setAnalyzer(executor) { imageProxy ->
+                                val currentTime = System.currentTimeMillis()
+                                if (currentTime - lastAnalysisTime < 350) {
+                                    imageProxy.close()
+                                    return@setAnalyzer
+                                }
+                                lastAnalysisTime = currentTime
+                                val mediaImage = imageProxy.image
+                                if (mediaImage != null) {
+                                    val inputImage = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
+                                    recognizer.process(inputImage)
+                                        .addOnSuccessListener { visionText ->
+                                            val blocks = visionText.textBlocks
+                                            if (blocks.isNotEmpty()) {
+                                                var minX = 10000
+                                                var minY = 10000
+                                                var maxX = -10000
+                                                var maxY = -10000
+                                                for (block in blocks) {
+                                                    block.boundingBox?.let { box ->
+                                                        if (box.left < minX) minX = box.left
+                                                        if (box.top < minY) minY = box.top
+                                                        if (box.right > maxX) maxX = box.right
+                                                        if (box.bottom > maxY) maxY = box.bottom
+                                                    }
+                                                }
+                                                detectedRect = android.graphics.Rect(minX, minY, maxX, maxY)
+                                                frameWidth = imageProxy.width
+                                                frameHeight = imageProxy.height
+                                                frameRotation = imageProxy.imageInfo.rotationDegrees
+                                            } else {
+                                                detectedRect = null
+                                            }
+                                        }
+                                        .addOnFailureListener {
+                                            detectedRect = null
+                                        }
+                                        .addOnCompleteListener {
+                                            imageProxy.close()
+                                        }
+                                } else {
+                                    imageProxy.close()
+                                }
+                            }
+
                             try {
                                 provider.unbindAll()
                                 camera = provider.bindToLifecycle(
                                     lifecycleOwner,
                                     CameraSelector.DEFAULT_BACK_CAMERA,
                                     preview,
-                                    imageCapture
+                                    imageCapture,
+                                    imageAnalysis
                                 )
                             } catch (e: Exception) {
                                 Log.e("Scanner", "Camera bind failed", e)
@@ -356,34 +421,110 @@ fun ScannerScreen(
                     modifier = Modifier.fillMaxSize()
                 )
 
-                // ── Document boundary overlays ────────────────────────────
-                Box(
+                // ── AI Document Auto-Detection Overlay Canvas ────────────────────────────
+                val neonGreen = Color(0xFF9DD68A)
+                val pulseAlpha by infiniteTransition.animateFloat(
+                    initialValue = 0.4f,
+                    targetValue = 0.85f,
+                    animationSpec = infiniteRepeatable(
+                        animation = tween(1000, easing = LinearEasing),
+                        repeatMode = RepeatMode.Reverse
+                    ),
+                    label = "pulseAlpha"
+                )
+
+                detectedRect?.let { rect ->
+                    val isRotated = frameRotation == 90 || frameRotation == 270
+                    val srcW = if (isRotated) frameHeight else frameWidth
+                    val srcH = if (isRotated) frameWidth else frameHeight
+
+                    if (srcW > 0 && srcH > 0) {
+                        androidx.compose.foundation.Canvas(modifier = Modifier.fillMaxSize()) {
+                            val scaleX = size.width / srcW
+                            val scaleY = size.height / srcH
+
+                            var left = rect.left * scaleX
+                            var top = rect.top * scaleY
+                            var right = rect.right * scaleX
+                            var bottom = rect.bottom * scaleY
+
+                            if (left > right) { val tmp = left; left = right; right = tmp }
+                            if (top > bottom) { val tmp = top; top = bottom; bottom = tmp }
+
+                            // Add a little padding to the box
+                            val pad = 30f
+                            val boxLeft = (left - pad).coerceAtLeast(16.dp.toPx())
+                            val boxTop = (top - pad).coerceAtLeast(100.dp.toPx())
+                            val boxRight = (right + pad).coerceAtMost(size.width - 16.dp.toPx())
+                            val boxBottom = (bottom + pad).coerceAtMost(size.height - 200.dp.toPx())
+
+                            // Draw rounded overlay container
+                            drawRoundRect(
+                                color = neonGreen.copy(alpha = pulseAlpha),
+                                topLeft = Offset(boxLeft, boxTop),
+                                size = androidx.compose.ui.geometry.Size(boxRight - boxLeft, boxBottom - boxTop),
+                                cornerRadius = androidx.compose.ui.geometry.CornerRadius(16.dp.toPx(), 16.dp.toPx()),
+                                style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.dp.toPx())
+                            )
+
+                            // Thick neon accent corners
+                            val len = 30.dp.toPx()
+                            val thick = 4.dp.toPx()
+
+                            // Top Left corner
+                            drawLine(neonGreen, Offset(boxLeft, boxTop), Offset(boxLeft + len, boxTop), strokeWidth = thick)
+                            drawLine(neonGreen, Offset(boxLeft, boxTop), Offset(boxLeft, boxTop + len), strokeWidth = thick)
+
+                            // Top Right corner
+                            drawLine(neonGreen, Offset(boxRight, boxTop), Offset(boxRight - len, boxTop), strokeWidth = thick)
+                            drawLine(neonGreen, Offset(boxRight, boxTop), Offset(boxRight, boxTop + len), strokeWidth = thick)
+
+                            // Bottom Left corner
+                            drawLine(neonGreen, Offset(boxLeft, boxBottom), Offset(boxLeft + len, boxBottom), strokeWidth = thick)
+                            drawLine(neonGreen, Offset(boxLeft, boxBottom), Offset(boxLeft, boxBottom - len), strokeWidth = thick)
+
+                            // Bottom Right corner
+                            drawLine(neonGreen, Offset(boxRight, boxBottom), Offset(boxRight - len, boxBottom), strokeWidth = thick)
+                            drawLine(neonGreen, Offset(boxRight, boxBottom), Offset(boxRight, boxBottom - len), strokeWidth = thick)
+                        }
+                    }
+                } ?: Box(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(horizontal = 32.dp, vertical = 120.dp)
                         .border(
                             width = 2.dp,
-                            color = MaterialTheme.colorScheme.tertiary,
+                            color = Color.White.copy(alpha = 0.3f),
                             shape = RoundedCornerShape(16.dp)
                         )
-                )
+                ) {
+                    CornerAccents()
+                }
 
-                CornerAccents()
-
-                // Hint label
+                // Hint label showing tracking status
                 Box(
                     modifier = Modifier
                         .align(Alignment.TopCenter)
                         .padding(top = 104.dp)
                         .clip(RoundedCornerShape(20.dp))
-                        .background(Color.Black.copy(alpha = 0.5f))
-                        .padding(horizontal = 16.dp, vertical = 6.dp)
+                        .background(Color.Black.copy(alpha = 0.7f))
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
                 ) {
-                    Text(
-                        "Align document inside the frame",
-                        color = Color.White,
-                        fontSize = 13.sp
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(8.dp)
+                                .clip(CircleShape)
+                                .background(if (detectedRect != null) Color(0xFF9DD68A) else Color.LightGray)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = if (detectedRect != null) "AI Tracked: Stable Frame" else "AI Searching for Document...",
+                            color = Color.White,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
 
                 // Top action bar
