@@ -136,7 +136,7 @@ fun DonateScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
+            CenterAlignedTopAppBar(
                 title = {
                     Text(
                         "Donate & Support",
@@ -147,18 +147,18 @@ fun DonateScreen(
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(
-                            Icons.Filled.ArrowBack,
+                            Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Back",
                             tint = MaterialTheme.colorScheme.onBackground
                         )
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
+                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
                     containerColor = Color.Transparent
                 )
             )
         },
-        containerColor = Color(0xFFF6F8FB) // Curious curated ultra-clean light grey background
+        containerColor = MaterialTheme.colorScheme.background
     ) { paddingValues ->
         Box(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
             Column(
@@ -249,10 +249,7 @@ fun DonateScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(16.dp))
-                            .background(
-                                if (selectedTier == 4) Color.White
-                                else MaterialTheme.colorScheme.surface
-                            )
+                            .background(MaterialTheme.colorScheme.surface)
                             .border(
                                 BorderStroke(
                                     if (selectedTier == 4) 2.dp else 1.dp,
@@ -505,7 +502,7 @@ fun TierRowItem(
     selected: Boolean,
     onClick: () -> Unit
 ) {
-    val bg = if (selected) Color.White else MaterialTheme.colorScheme.surface
+    val bg = MaterialTheme.colorScheme.surface
     val borderCol = if (selected) Color(0xFF7C3AED) else MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
 
     Box(

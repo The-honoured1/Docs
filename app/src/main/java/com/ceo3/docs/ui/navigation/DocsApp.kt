@@ -108,7 +108,7 @@ fun DocsApp() {
     }
 }
 
-@Composable
+private @Composable
 fun PillNavigationBar(
     currentRoute: String?,
     navController: NavHostController,
@@ -150,7 +150,7 @@ fun PillNavigationBar(
     }
 }
 
-@Composable
+private @Composable
 fun PillNavItem(
     item: NavItem,
     selected: Boolean,

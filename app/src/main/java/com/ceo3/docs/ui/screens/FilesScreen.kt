@@ -27,6 +27,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
@@ -273,7 +274,42 @@ fun FilesScreen(
                         .weight(1f),
                     contentAlignment = Alignment.Center
                 ) {
-                    NoneEmptyState(text = "None")
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(22.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                            .padding(32.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(64.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.outline.copy(alpha = 0.1f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.FolderOff,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(30.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            text = "No documents yet",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Import a file or scan a document to get started",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center
+                        )
+                    }
                 }
             } else {
                 LazyColumn(
@@ -336,94 +372,113 @@ fun EditableDocumentListItem(
     val formatter = remember { SimpleDateFormat("MMM dd, yyyy - hh:mm a", Locale.getDefault()) }
     val dateStr = formatter.format(Date(document.lastModified))
 
-    val icon = when (document.type.uppercase()) {
-        "PDF" -> Icons.Filled.PictureAsPdf
-        "DOCX", "DOC" -> Icons.Filled.Description
-        else -> Icons.Filled.TextSnippet
-    }
-
-    val iconColor = when (document.type.uppercase()) {
-        "PDF" -> Color(0xFFE57373)
-        "DOCX", "DOC" -> Color(0xFF64B5F6)
-        else -> Color(0xFFFFB74D)
+    val (icon, iconBg, iconTint) = when (document.type.uppercase()) {
+        "PDF"       -> Triple(Icons.Filled.PictureAsPdf,   com.ceo3.docs.ui.theme.AccentRose.copy(alpha = 0.12f),    com.ceo3.docs.ui.theme.AccentRose)
+        "DOCX","DOC"-> Triple(Icons.Filled.Description,    com.ceo3.docs.ui.theme.AccentSky.copy(alpha = 0.12f),     com.ceo3.docs.ui.theme.AccentSky)
+        else        -> Triple(Icons.Filled.TextSnippet,     com.ceo3.docs.ui.theme.AccentAmber.copy(alpha = 0.12f),   com.ceo3.docs.ui.theme.AccentAmber)
     }
 
     var showMenu by remember { mutableStateOf(false) }
 
+    val interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) 0.97f else 1f,
+        animationSpec = tween(80),
+        label = "editableDocScale"
+    )
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
+            .scale(scale)
+            .clip(RoundedCornerShape(18.dp))
             .background(MaterialTheme.colorScheme.surface)
             .border(
-                BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.04f)),
-                RoundedCornerShape(16.dp)
+                width = 1.dp,
+                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f),
+                shape = RoundedCornerShape(18.dp)
             )
-            .clickable { onClick() }
-            .padding(16.dp),
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onClick
+            )
+            .padding(14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = iconColor,
-            modifier = Modifier.size(28.dp)
-        )
-        Spacer(modifier = Modifier.width(16.dp))
+        // File type icon with colored background
+        Box(
+            modifier = Modifier
+                .size(44.dp)
+                .clip(RoundedCornerShape(13.dp))
+                .background(iconBg),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = iconTint,
+                modifier = Modifier.size(22.dp)
+            )
+        }
+
+        Spacer(modifier = Modifier.width(14.dp))
+
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = document.title,
-                fontWeight = FontWeight.Bold,
-                fontSize = 14.sp,
+                style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
-            Spacer(modifier = Modifier.height(2.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = document.type.uppercase(),
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+            Spacer(modifier = Modifier.height(3.dp))
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                // Type badge
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(5.dp))
+                        .background(iconBg)
+                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                ) {
+                    Text(
+                        text = document.type.uppercase(),
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = iconTint
+                    )
+                }
                 if (document.tags.contains("External")) {
                     val folder = document.tags.substringAfter("External,").uppercase()
-                    Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "•",
-                        fontSize = 10.sp,
+                        text = "·",
+                        style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(MaterialTheme.colorScheme.secondaryContainer)
-                            .padding(horizontal = 6.dp, vertical = 2.dp)
-                    ) {
-                        Text(
-                            text = folder,
-                            fontSize = 8.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = MaterialTheme.colorScheme.onSecondaryContainer
-                        )
-                    }
+                    Text(
+                        text = folder,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1
+                    )
                 }
-                Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = "•",
-                    fontSize = 10.sp,
+                    text = "·",
+                    style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
                 )
-                Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = dateStr,
-                    fontSize = 10.sp,
+                    style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
+
         Box {
             IconButton(onClick = { showMenu = true }) {
                 Icon(
@@ -438,15 +493,15 @@ fun EditableDocumentListItem(
                 modifier = Modifier.background(MaterialTheme.colorScheme.surface)
             ) {
                 DropdownMenuItem(
-                    text = { Text("Open File") },
+                    text = { Text("Open File", style = MaterialTheme.typography.bodyMedium) },
                     onClick = {
                         showMenu = false
                         onClick()
                     },
-                    leadingIcon = { Icon(Icons.Filled.FileOpen, contentDescription = null) }
+                    leadingIcon = { Icon(Icons.Filled.FileOpen, contentDescription = null, modifier = Modifier.size(18.dp)) }
                 )
                 DropdownMenuItem(
-                    text = { Text("Delete permanently", color = MaterialTheme.colorScheme.error) },
+                    text = { Text("Delete permanently", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error) },
                     onClick = {
                         showMenu = false
                         onDelete()
@@ -455,7 +510,8 @@ fun EditableDocumentListItem(
                         Icon(
                             Icons.Filled.Delete,
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.error
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(18.dp)
                         )
                     }
                 )
