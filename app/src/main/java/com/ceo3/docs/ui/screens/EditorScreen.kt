@@ -832,7 +832,7 @@ fun PdfAnnotatorView(
                                     modifier = Modifier
                                         .width(36.dp)
                                         .height(55.dp)
-                                        .clip(RoundedCornerShape(t = 4.dp, b = 0.dp))
+                                        .clip(RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp))
                                         .background(Color(0xFF3B82F6))
                                 )
                                 Spacer(modifier = Modifier.height(4.dp))
@@ -850,7 +850,7 @@ fun PdfAnnotatorView(
                                     modifier = Modifier
                                         .width(36.dp)
                                         .height(72.dp)
-                                        .clip(RoundedCornerShape(t = 4.dp, b = 0.dp))
+                                        .clip(RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp))
                                         .background(Color(0xFF3B82F6))
                                 )
                                 Spacer(modifier = Modifier.height(4.dp))
@@ -868,7 +868,7 @@ fun PdfAnnotatorView(
                                     modifier = Modifier
                                         .width(36.dp)
                                         .height(95.dp)
-                                        .clip(RoundedCornerShape(t = 4.dp, b = 0.dp))
+                                        .clip(RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp))
                                         .background(Color(0xFF3B82F6))
                                 )
                                 Spacer(modifier = Modifier.height(4.dp))

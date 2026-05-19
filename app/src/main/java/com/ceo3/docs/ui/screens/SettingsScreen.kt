@@ -1,6 +1,6 @@
 package com.ceo3.docs.ui.screens
 
-import androidx.compose.foundation.Brush
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable

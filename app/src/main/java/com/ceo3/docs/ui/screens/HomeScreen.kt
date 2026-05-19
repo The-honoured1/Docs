@@ -421,7 +421,7 @@ fun HomeScreen(
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = 24.dp, bottom = 12.dp)
+                        modifier = Modifier.padding(start = 24.dp, end = 24.dp, bottom = 12.dp)
                     )
                 }
 
@@ -447,7 +447,7 @@ fun HomeScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 24.dp, bottom = 12.dp),
+                            .padding(start = 24.dp, end = 24.dp, bottom = 12.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
