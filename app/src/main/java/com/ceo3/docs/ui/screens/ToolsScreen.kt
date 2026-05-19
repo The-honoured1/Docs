@@ -118,6 +118,14 @@ class ToolsViewModel(application: android.app.Application) : AndroidViewModel(ap
     val selectedFileName = mutableStateOf("")
     val chatMessages = mutableStateListOf<Pair<String, String>>() // Pair of (Sender, Message)
 
+    private val prefs = application.getSharedPreferences("ai_settings", android.content.Context.MODE_PRIVATE)
+    val geminiApiKey = mutableStateOf(prefs.getString("gemini_api_key", "") ?: "")
+
+    fun saveGeminiApiKey(key: String) {
+        prefs.edit().putString("gemini_api_key", key).apply()
+        geminiApiKey.value = key
+    }
+
     // Local spelling dictionary of common typos
     val spellingDictionary = mapOf(
         "teh" to "the", "recieve" to "receive", "dont" to "don't", "cant" to "can't",
@@ -287,44 +295,134 @@ class ToolsViewModel(application: android.app.Application) : AndroidViewModel(ap
         if (question.trim().isEmpty()) return
         chatMessages.add("User" to question)
         val docText = selectedFileText.value
-        if (docText.trim().isEmpty()) {
-            chatMessages.add("AI" to "The document appears to be empty, so I can't search for answers.")
-            return
-        }
+        val apiKey = geminiApiKey.value
 
-        viewModelScope.launch(Dispatchers.Default) {
-            val sentences = docText.split(Regex("(?<=[.!?])\\s+")).filter { it.trim().isNotEmpty() }
-            val queryWords = question.lowercase().split(Regex("[^a-zA-Z]")).filter { it.length > 2 }
-            
-            if (queryWords.isEmpty()) {
+        if (apiKey.trim().isNotEmpty()) {
+            viewModelScope.launch(Dispatchers.IO) {
                 withContext(Dispatchers.Main) {
-                    chatMessages.add("AI" to "Please ask a more specific question with more words.")
+                    chatMessages.add("AI" to "Thinking...")
                 }
-                return@launch
-            }
-
-            var bestSentence = ""
-            var bestScore = 0f
-
-            sentences.forEach { sentence ->
-                val sentenceWords = sentence.lowercase().split(Regex("[^a-zA-Z]")).filter { it.isNotEmpty() }.toSet()
-                val intersection = queryWords.filter { it in sentenceWords }.size
-                val score = intersection.toFloat() / (queryWords.size + sentenceWords.size - intersection) // Jaccard Similarity
-                if (score > bestScore) {
-                    bestScore = score
-                    bestSentence = sentence
+                val reply = callGeminiApi(apiKey, docText, question)
+                withContext(Dispatchers.Main) {
+                    if (chatMessages.isNotEmpty() && chatMessages.last().second == "Thinking...") {
+                        chatMessages.removeAt(chatMessages.size - 1)
+                    }
+                    chatMessages.add("AI" to reply)
                 }
             }
+        } else {
+            if (docText.trim().isEmpty()) {
+                chatMessages.add("AI" to "The document appears to be empty, so I can't search for answers.")
+                return
+            }
 
-            val reply = if (bestScore > 0.04f) {
-                "Based on the document context, I found this relevant passage:\n\n\"${bestSentence.trim()}\""
+            viewModelScope.launch(Dispatchers.Default) {
+                val sentences = docText.split(Regex("(?<=[.!?])\\s+")).filter { it.trim().isNotEmpty() }
+                val queryWords = question.lowercase().split(Regex("[^a-zA-Z]")).filter { it.length > 2 }
+                
+                if (queryWords.isEmpty()) {
+                    withContext(Dispatchers.Main) {
+                        chatMessages.add("AI" to "Please ask a more specific question with more words.")
+                    }
+                    return@launch
+                }
+
+                var bestSentence = ""
+                var bestScore = 0f
+
+                sentences.forEach { sentence ->
+                    val sentenceWords = sentence.lowercase().split(Regex("[^a-zA-Z]")).filter { it.isNotEmpty() }.toSet()
+                    val intersection = queryWords.filter { it in sentenceWords }.size
+                    val score = intersection.toFloat() / (queryWords.size + sentenceWords.size - intersection) // Jaccard Similarity
+                    if (score > bestScore) {
+                        bestScore = score
+                        bestSentence = sentence
+                    }
+                }
+
+                val reply = if (bestScore > 0.04f) {
+                    "Based on the document context, I found this relevant passage:\n\n\"${bestSentence.trim()}\""
+                } else {
+                    "I couldn't find a direct reference to that in the document. Enter a Gemini API key at the top to chat with real AI."
+                }
+
+                withContext(Dispatchers.Main) {
+                    chatMessages.add("AI" to reply)
+                }
+            }
+        }
+    }
+
+    private fun callGeminiApi(apiKey: String, documentContext: String, userQuestion: String): String {
+        return try {
+            val contextSnippet = if (documentContext.length > 30000) {
+                documentContext.substring(0, 30000) + "... [truncated due to size]"
             } else {
-                "I couldn't find a direct reference to that in the document. Here is the beginning context:\n\n\"${sentences.take(2).joinToString(" ").trim()}...\""
+                documentContext
             }
 
-            withContext(Dispatchers.Main) {
-                chatMessages.add("AI" to reply)
+            val promptText = "You are a helpful assistant analyzing a document for the user. Here is the context/text of the document:\n\n$contextSnippet\n\nUser Question: $userQuestion\n\nProvide a concise and helpful answer based on the document context."
+
+            val url = java.net.URL("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=$apiKey")
+            val conn = url.openConnection() as java.net.HttpURLConnection
+            conn.requestMethod = "POST"
+            conn.setRequestProperty("Content-Type", "application/json")
+            conn.doOutput = true
+
+            val jsonBody = org.json.JSONObject().apply {
+                put("contents", org.json.JSONArray().apply {
+                    put(org.json.JSONObject().apply {
+                        put("parts", org.json.JSONArray().apply {
+                            put(org.json.JSONObject().apply {
+                                put("text", promptText)
+                            })
+                        })
+                    })
+                })
             }
+
+            conn.outputStream.use { os ->
+                os.write(jsonBody.toString().toByteArray(Charsets.UTF_8))
+            }
+
+            val responseCode = conn.responseCode
+            if (responseCode == java.net.HttpURLConnection.HTTP_OK) {
+                val responseText = conn.inputStream.bufferedReader().use { it.readText() }
+                parseGeminiResponse(responseText)
+            } else {
+                val errorText = conn.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
+                "API Error (HTTP $responseCode): ${extractErrorMessage(errorText)}"
+            }
+        } catch (e: Exception) {
+            "Error contacting Gemini API: ${e.message}"
+        }
+    }
+
+    private fun parseGeminiResponse(jsonResponse: String): String {
+        return try {
+            val root = org.json.JSONObject(jsonResponse)
+            val candidates = root.getJSONArray("candidates")
+            if (candidates.length() > 0) {
+                val firstCandidate = candidates.getJSONObject(0)
+                val content = firstCandidate.getJSONObject("content")
+                val parts = content.getJSONArray("parts")
+                if (parts.length() > 0) {
+                    return parts.getJSONObject(0).getString("text")
+                }
+            }
+            "No response text returned by Gemini."
+        } catch (e: Exception) {
+            "Failed to parse AI response: ${e.message}"
+        }
+    }
+
+    private fun extractErrorMessage(errorJson: String): String {
+        return try {
+            val root = org.json.JSONObject(errorJson)
+            val error = root.getJSONObject("error")
+            error.getString("message")
+        } catch (e: Exception) {
+            errorJson
         }
     }
 
@@ -1722,9 +1820,58 @@ fun ToolsScreen(
             onDismissRequest = { activeToolName = "" },
             title = { Text("Chat PDF Workspace", fontWeight = FontWeight.Bold) },
             text = {
-                Column(modifier = Modifier.fillMaxWidth().height(400.dp)) {
+                Column(modifier = Modifier.fillMaxWidth().height(440.dp)) {
                     Text("Document: ${viewModel.selectedFileName.value}", fontSize = 12.sp, color = Color.Gray)
-                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    var showApiKeyInput by remember { mutableStateOf(viewModel.geminiApiKey.value.isEmpty()) }
+                    var apiKeyInputText by remember { mutableStateOf(viewModel.geminiApiKey.value) }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = if (viewModel.geminiApiKey.value.isNotEmpty()) "Gemini AI: Connected" else "Gemini AI: Offline Mode",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (viewModel.geminiApiKey.value.isNotEmpty()) Color(0xFF10B981) else Color.Gray,
+                            modifier = Modifier.weight(1f)
+                        )
+                        TextButton(
+                            onClick = { showApiKeyInput = !showApiKeyInput },
+                            contentPadding = PaddingValues(0.dp)
+                        ) {
+                            Text(if (showApiKeyInput) "Hide Key Setup" else "Setup API Key", fontSize = 11.sp)
+                        }
+                    }
+
+                    if (showApiKeyInput) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            OutlinedTextField(
+                                value = apiKeyInputText,
+                                onValueChange = { apiKeyInputText = it },
+                                label = { Text("Enter Gemini API Key", fontSize = 11.sp) },
+                                singleLine = true,
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(8.dp),
+                                trailingIcon = {
+                                    if (apiKeyInputText.isNotEmpty()) {
+                                        IconButton(onClick = {
+                                            viewModel.saveGeminiApiKey(apiKeyInputText)
+                                            showApiKeyInput = false
+                                        }) {
+                                            Icon(Icons.Filled.Check, contentDescription = "Save Key", tint = Color(0xFF10B981))
+                                        }
+                                    }
+                                }
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(4.dp))
                     LazyColumn(
                         modifier = Modifier
                             .weight(1f)

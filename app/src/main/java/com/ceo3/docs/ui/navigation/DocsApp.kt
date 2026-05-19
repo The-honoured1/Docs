@@ -3,6 +3,8 @@ package com.ceo3.docs.ui.navigation
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
@@ -216,10 +218,10 @@ fun DocsNavHost(navController: NavHostController, modifier: Modifier = Modifier)
         navController = navController,
         startDestination = Screen.Home.route,
         modifier = modifier,
-        enterTransition = { fadeIn(animationSpec = tween(120)) },
-        exitTransition = { fadeOut(animationSpec = tween(120)) },
-        popEnterTransition = { fadeIn(animationSpec = tween(120)) },
-        popExitTransition = { fadeOut(animationSpec = tween(120)) }
+        enterTransition = { EnterTransition.None },
+        exitTransition = { ExitTransition.None },
+        popEnterTransition = { EnterTransition.None },
+        popExitTransition = { ExitTransition.None }
     ) {
         composable(Screen.Home.route) {
             HomeScreen(

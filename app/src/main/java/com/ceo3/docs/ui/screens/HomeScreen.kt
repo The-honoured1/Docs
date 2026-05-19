@@ -49,6 +49,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import java.io.File
+import java.io.FileOutputStream
+import android.widget.Toast
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -170,7 +172,43 @@ fun HomeScreen(
     val filePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
-        uri?.let { onNavigateToEditor(it.toString()) }
+        uri?.let { selectedUri ->
+            fun getFileNameFromUri(context: android.content.Context, uri: Uri): String? {
+                var name: String? = null
+                if (uri.scheme == "content") {
+                    val cursor = context.contentResolver.query(uri, null, null, null, null)
+                    cursor?.use {
+                        if (it.moveToFirst()) {
+                            val index = it.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                            if (index != -1) name = it.getString(index)
+                        }
+                    }
+                }
+                if (name == null) {
+                    name = uri.path
+                    val cut = name?.lastIndexOf('/') ?: -1
+                    if (cut != -1) {
+                        name = name?.substring(cut + 1)
+                    }
+                }
+                return name
+            }
+
+            try {
+                val fileName = getFileNameFromUri(context, selectedUri) ?: "imported_doc.pdf"
+                val extension = fileName.substringAfterLast(".", "pdf").lowercase()
+                val cacheFile = File(context.cacheDir, "temp_import_${System.currentTimeMillis()}.$extension")
+                context.contentResolver.openInputStream(selectedUri)?.use { input ->
+                    FileOutputStream(cacheFile).use { output ->
+                        input.copyTo(output)
+                    }
+                }
+                onNavigateToEditor(cacheFile.absolutePath)
+            } catch (e: Exception) {
+                Log.e("HomeScreen", "Failed to copy picked file to cache", e)
+                Toast.makeText(context, "Failed to load document", Toast.LENGTH_SHORT).show()
+            }
+        }
     }
 
     var hasStoragePermission by remember {
