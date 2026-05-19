@@ -103,6 +103,63 @@ class FilesViewModel(application: android.app.Application) : androidx.lifecycle.
             dao.insertDocument(doc.copy(isPinned = !doc.isPinned))
         }
     }
+
+    fun scanAndImportFromDownloads(context: android.content.Context) {
+        val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+        if (downloadsDir.exists() && downloadsDir.isDirectory) {
+            val files = downloadsDir.listFiles() ?: emptyArray()
+            val supportedExtensions = listOf("pdf", "docx", "doc", "xlsx", "xls", "pptx", "ppt", "png", "jpg", "jpeg")
+            
+            viewModelScope.launch(Dispatchers.IO) {
+                var importedCount = 0
+                files.forEach { file ->
+                    val ext = file.extension.lowercase()
+                    if (file.isFile && ext in supportedExtensions) {
+                        val docName = file.name
+                        val cleanId = "download_${file.nameWithoutExtension}"
+                        val existing = dao.getDocumentById(cleanId)
+                        if (existing == null) {
+                            try {
+                                val destFile = java.io.File(context.filesDir, "doc_${cleanId}.${ext}")
+                                file.inputStream().use { input ->
+                                    destFile.outputStream().use { output ->
+                                        input.copyTo(output)
+                                    }
+                                }
+                                
+                                val doc = DocumentEntity(
+                                    id = cleanId,
+                                    title = docName,
+                                    type = ext.uppercase(),
+                                    lastModified = file.lastModified(),
+                                    isPinned = false,
+                                    tags = "Downloads,Imported",
+                                    accentTheme = "classic",
+                                    accentColor = "blue"
+                                )
+                                dao.insertDocument(doc)
+                                importedCount++
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                            }
+                        }
+                    }
+                }
+                
+                // Switch back to Main thread for visual feedback
+                kotlinx.coroutines.withContext(Dispatchers.Main) {
+                    if (importedCount > 0) {
+                        Toast.makeText(context, "Imported $importedCount new files from phone Downloads!", Toast.LENGTH_LONG).show()
+                    } else {
+                        Toast.makeText(context, "No new documents found in phone Downloads.", Toast.LENGTH_SHORT).show()
+                    }
+                    selectFolder("Downloads")
+                }
+            }
+        } else {
+            Toast.makeText(context, "Downloads folder not accessible.", Toast.LENGTH_SHORT).show()
+        }
+    }
 }
 
 data class FolderItem(
@@ -136,7 +193,7 @@ fun FilesScreen(
         contract = ActivityResultContracts.RequestPermission()
     ) { isGranted ->
         if (isGranted) {
-            scanAndImportFromDownloads(context, viewModel)
+            viewModel.scanAndImportFromDownloads(context)
         } else {
             Toast.makeText(context, "Storage permission is required to read Downloads folder.", Toast.LENGTH_SHORT).show()
         }
@@ -278,7 +335,7 @@ fun FilesScreen(
                                             }
 
                                             if (hasManagePermission) {
-                                                scanAndImportFromDownloads(context, viewModel)
+                                                viewModel.scanAndImportFromDownloads(context)
                                             } else {
                                                 showPermissionExplanationDialog = true
                                             }
@@ -385,8 +442,9 @@ fun FilesScreen(
                             onClick = { onDocumentClick(doc.id) },
                             onStarToggle = { viewModel.togglePin(doc) }
                         )
-                    }
                 }
+            }
+        }
         if (showPermissionExplanationDialog) {
             AlertDialog(
                 onDismissRequest = { showPermissionExplanationDialog = false },
@@ -659,61 +717,5 @@ fun FileRowItem(
     }
 }
 
-fun scanAndImportFromDownloads(context: android.content.Context, viewModel: FilesViewModel) {
-    val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-    if (downloadsDir.exists() && downloadsDir.isDirectory) {
-        val files = downloadsDir.listFiles() ?: emptyArray()
-        val supportedExtensions = listOf("pdf", "docx", "doc", "xlsx", "xls", "pptx", "ppt", "png", "jpg", "jpeg")
-        
-        viewModel.viewModelScope.launch(Dispatchers.IO) {
-            var importedCount = 0
-            val dao = com.ceo3.docs.data.local.DocDatabase.getDatabase(context).documentDao()
-            files.forEach { file ->
-                val ext = file.extension.lowercase()
-                if (file.isFile && ext in supportedExtensions) {
-                    val docName = file.name
-                    val cleanId = "download_${file.nameWithoutExtension}"
-                    val existing = dao.getDocumentById(cleanId)
-                    if (existing == null) {
-                        try {
-                            val destFile = java.io.File(context.filesDir, "doc_${cleanId}.${ext}")
-                            file.inputStream().use { input ->
-                                destFile.outputStream().use { output ->
-                                    input.copyTo(output)
-                                }
-                            }
-                            
-                            val doc = DocumentEntity(
-                                id = cleanId,
-                                title = docName,
-                                type = ext.uppercase(),
-                                lastModified = file.lastModified(),
-                                isPinned = false,
-                                tags = "Downloads,Imported",
-                                accentTheme = "classic",
-                                accentColor = "blue"
-                            )
-                            dao.insertDocument(doc)
-                            importedCount++
-                        } catch (e: Exception) {
-                            e.printStackTrace()
-                        }
-                    }
-                }
-            }
-            
-            // Switch back to Main thread for visual feedback
-            kotlinx.coroutines.withContext(Dispatchers.Main) {
-                if (importedCount > 0) {
-                    Toast.makeText(context, "Imported $importedCount new files from phone Downloads!", Toast.LENGTH_LONG).show()
-                } else {
-                    Toast.makeText(context, "No new documents found in phone Downloads.", Toast.LENGTH_SHORT).show()
-                }
-                viewModel.selectFolder("Downloads")
-            }
-        }
-    } else {
-        Toast.makeText(context, "Downloads folder not accessible.", Toast.LENGTH_SHORT).show()
-    }
-}
+
 
