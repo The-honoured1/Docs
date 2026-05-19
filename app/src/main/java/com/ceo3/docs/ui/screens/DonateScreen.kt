@@ -20,6 +20,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
@@ -35,7 +36,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.random.Random
 
-// Confetti particle representation for high-juice micro-interactions
+// Confetti particle representation for high-juice celebration
 data class ConfettiParticle(
     val id: Int,
     var x: Float,
@@ -56,34 +57,45 @@ fun DonateScreen(
     val scrollState = rememberScrollState()
     val scope = rememberCoroutineScope()
 
-    var selectedTier by remember { mutableStateOf<Int?>(1) } // 0: $2, 1: $5, 2: $10, 3: $25, 4: Custom
+    var selectedTier by remember { mutableStateOf<Int?>(1) } // 0: $3, 1: $8, 2: $15, 3: $35, 4: Custom
     var customAmount by remember { mutableStateOf("") }
     val customAmountVal = customAmount.toDoubleOrNull() ?: 0.0
 
     var isProcessing by remember { mutableStateOf(false) }
     var showThankYouDialog by remember { mutableStateOf(false) }
 
-    // Particle state for thank-you celebration
+    // Particle state for celebration
     val particles = remember { mutableStateListOf<ConfettiParticle>() }
     var confettiActive by remember { mutableStateOf(false) }
 
     // Pulse animation for the heart icon
     val infiniteTransition = rememberInfiniteTransition(label = "pulse")
     val pulseScale by infiniteTransition.animateFloat(
-        initialValue = 0.9f,
-        targetValue = 1.15f,
+        initialValue = 0.92f,
+        targetValue = 1.12f,
         animationSpec = infiniteRepeatable(
-            animation = tween(800, easing = FastOutSlowInEasing),
+            animation = tween(1000, easing = EaseInOutSine),
             repeatMode = RepeatMode.Reverse
         ),
         label = "pulse"
     )
 
+    // Rotating ring around heart
+    val rotateAngle by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(6000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "rotation"
+    )
+
     val tiers = listOf(
-        DonateTier("📚 School Supplies", 2.0, "Provides notebooks and pens for a student", Color(0xFFFFB84D)),
-        DonateTier("🍲 Daily Meals", 5.0, "Feeds a child nutritious meals for a week", Color(0xFFFFAA3B)),
-        DonateTier("🏫 Classroom Fund", 10.0, "Contributes to building safe learning spaces", Color(0xFFE57373)),
-        DonateTier("🎓 Education Sponsor", 25.0, "Sponsors a full month of quality education", Color(0xFFCFC3FF))
+        DonateTier("☕ App Coffee Support", 3.0, "Keeps the developer highly caffeinated and focused", Color(0xFFFBBF24), Icons.Filled.Coffee),
+        DonateTier("🍰 Sweet Appreciation", 8.0, "Sponsors a slice of cake for code achievements", Color(0xFFEC4899), Icons.Filled.Cake),
+        DonateTier("🍕 Dev Pizza Feast", 15.0, "Funds a hot cheese pizza for late-night feature builds", Color(0xFF10B981), Icons.Filled.LocalPizza),
+        DonateTier("👑 Royal Sponsor", 35.0, "Enrolls you in the ultimate premium hall of fame", Color(0xFF6366F1), Icons.Filled.WorkspacePremium)
     )
 
     val currentAmount = when (selectedTier) {
@@ -96,32 +108,31 @@ fun DonateScreen(
     if (confettiActive) {
         LaunchedEffect(Unit) {
             val colors = listOf(
-                Color(0xFFFFDF70), // Bright Yellow
-                Color(0xFF9DD68A), // Accent Green
-                Color(0xFFFFAA3B), // Accent Orange
-                Color(0xFFCFC3FF), // Accent Purple
-                Color(0xFFBCE3A6), // Soft Green
-                Color(0xFFFF8A80)  // Pastel Red
+                Color(0xFFFFDF70), // Gold
+                Color(0xFF60A5FA), // Blue
+                Color(0xFF34D399), // Emerald
+                Color(0xFFF472B6), // Pink
+                Color(0xFFA78BFA)  // Violet
             )
             particles.clear()
-            repeat(150) { id ->
+            repeat(160) { id ->
                 particles.add(
                     ConfettiParticle(
                         id = id,
-                        x = Random.nextFloat() * 1200f,
-                        y = -Random.nextFloat() * 600f,
+                        x = Random.nextFloat() * 1400f,
+                        y = -Random.nextFloat() * 800f - 100f,
                         color = colors.random(),
-                        size = Random.nextFloat() * 18f + 10f,
-                        speedY = Random.nextFloat() * 10f + 7f,
-                        speedX = Random.nextFloat() * 8f - 4f,
+                        size = Random.nextFloat() * 16f + 8f,
+                        speedY = Random.nextFloat() * 12f + 6f,
+                        speedX = Random.nextFloat() * 6f - 3f,
                         rotation = Random.nextFloat() * 360f,
-                        rotationSpeed = Random.nextFloat() * 6f - 3f
+                        rotationSpeed = Random.nextFloat() * 8f - 4f
                     )
                 )
             }
 
             val startTime = System.currentTimeMillis()
-            while (System.currentTimeMillis() - startTime < 4000) {
+            while (System.currentTimeMillis() - startTime < 4200) {
                 particles.forEach { p ->
                     p.y += p.speedY
                     p.x += p.speedX
@@ -139,9 +150,11 @@ fun DonateScreen(
             CenterAlignedTopAppBar(
                 title = {
                     Text(
-                        "Help Children in Africa",
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onBackground
+                        "Sponsor Application",
+                        fontWeight = FontWeight.ExtraBold,
+                        fontSize = 18.sp,
+                        letterSpacing = 0.5.sp,
+                        color = Color(0xFF1E293B)
                     )
                 },
                 navigationIcon = {
@@ -149,23 +162,23 @@ fun DonateScreen(
                         Icon(
                             Icons.Filled.ArrowBack,
                             contentDescription = "Back",
-                            tint = MaterialTheme.colorScheme.onBackground
+                            tint = Color(0xFF1E293B)
                         )
                     }
                 },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                    containerColor = Color.Transparent
+                    containerColor = Color(0xFFF8FAFC)
                 )
             )
         },
-        containerColor = MaterialTheme.colorScheme.background
+        containerColor = Color(0xFFF8FAFC) // Sleek cool-white background
     ) { paddingValues ->
         Box(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .verticalScroll(scrollState)
-                    .padding(horizontal = 20.dp, vertical = 8.dp),
+                    .padding(horizontal = 20.dp, vertical = 12.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 // Header Banner using beautiful premium Indigo-to-Blue Linear Gradient
@@ -175,43 +188,65 @@ fun DonateScreen(
                         .clip(RoundedCornerShape(24.dp))
                         .background(
                             Brush.linearGradient(
-                                listOf(Color(0xFF7C3AED), Color(0xFF2563EB))
+                                colors = listOf(Color(0xFF4F46E5), Color(0xFFEC4899)),
+                                start = Offset.Zero,
+                                end = Offset.Infinite
                             )
                         )
-                        .shadow(8.dp, RoundedCornerShape(24.dp))
-                        .padding(24.dp)
+                        .shadow(12.dp, RoundedCornerShape(24.dp))
+                        .padding(28.dp)
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Box(
-                            modifier = Modifier
-                                .size(72.dp)
-                                .clip(CircleShape)
-                                .background(Color.White.copy(alpha = 0.2f))
-                                .graphicsLayer {
-                                    scaleX = pulseScale
-                                    scaleY = pulseScale
-                                },
-                            contentAlignment = Alignment.Center
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier.size(90.dp)
                         ) {
-                            Icon(
-                                imageVector = Icons.Filled.Favorite,
-                                contentDescription = null,
-                                tint = Color.White,
-                                modifier = Modifier.size(36.dp)
+                            // Rotating glassmorphic ring
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .border(
+                                        width = 3.dp,
+                                        brush = Brush.sweepGradient(
+                                            colors = listOf(Color.White.copy(0.1f), Color.White, Color.White.copy(0.1f))
+                                        ),
+                                        shape = CircleShape
+                                    )
+                                    .rotate(rotateAngle)
                             )
+                            
+                            Box(
+                                modifier = Modifier
+                                    .size(68.dp)
+                                    .clip(CircleShape)
+                                    .background(Color.White.copy(alpha = 0.2f))
+                                    .graphicsLayer {
+                                        scaleX = pulseScale
+                                        scaleY = pulseScale
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.Favorite,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(34.dp)
+                                )
+                            }
                         }
-                        Spacer(modifier = Modifier.height(16.dp))
+                        
+                        Spacer(modifier = Modifier.height(18.dp))
                         Text(
-                            text = "SUPPORT CHILDREN IN AFRICA",
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.ExtraBold,
+                            text = "SUPPORT OUR APP IN STYLE",
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Black,
                             color = Color.White,
                             textAlign = TextAlign.Center,
-                            letterSpacing = 1.sp
+                            letterSpacing = 2.sp
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = "Every contribution helps provide essential education, nutritious meals, and safe shelter for children in Africa. Together, we can build a brighter future. If our application has added value to your life, please consider giving back to those in need.",
+                            text = "If you enjoy our document suite, premium slide editor, and scan utilities, consider buying the dev team a coffee or treat! We keep the app 100% offline, private, and clean.",
                             fontSize = 12.sp,
                             color = Color.White.copy(alpha = 0.9f),
                             textAlign = TextAlign.Center,
@@ -224,9 +259,9 @@ fun DonateScreen(
 
                 Text(
                     text = "Select Support Tier",
-                    fontSize = 16.sp,
+                    fontSize = 15.sp,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onBackground,
+                    color = Color(0xFF1E293B),
                     modifier = Modifier.align(Alignment.Start)
                 )
                 Spacer(modifier = Modifier.height(12.dp))
@@ -248,17 +283,16 @@ fun DonateScreen(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(MaterialTheme.colorScheme.surface)
+                            .clip(RoundedCornerShape(18.dp))
+                            .background(Color.White)
                             .border(
                                 BorderStroke(
-                                    if (selectedTier == 4) 2.dp else 1.dp,
-                                    if (selectedTier == 4) Color(0xFF7C3AED)
-                                    else MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+                                    width = if (selectedTier == 4) 2.dp else 1.dp,
+                                    color = if (selectedTier == 4) Color(0xFF6366F1) else Color(0xFFE2E8F0)
                                 ),
-                                RoundedCornerShape(16.dp)
+                                RoundedCornerShape(18.dp)
                             )
-                            .shadow(if (selectedTier == 4) 4.dp else 1.dp, RoundedCornerShape(16.dp))
+                            .shadow(if (selectedTier == 4) 6.dp else 1.dp, RoundedCornerShape(18.dp))
                             .clickable { selectedTier = 4 }
                             .padding(16.dp)
                     ) {
@@ -271,37 +305,37 @@ fun DonateScreen(
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Box(
                                         modifier = Modifier
-                                            .size(40.dp)
-                                            .clip(RoundedCornerShape(10.dp))
-                                            .background(Color(0xFFE2E8F0)),
+                                            .size(42.dp)
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .background(Color(0xFFF1F5F9)),
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Icon(
-                                            imageVector = Icons.Filled.Stars,
+                                            imageVector = Icons.Filled.Add,
                                             contentDescription = null,
                                             tint = Color(0xFF64748B),
                                             modifier = Modifier.size(20.dp)
                                         )
                                     }
-                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Spacer(modifier = Modifier.width(14.dp))
                                     Text(
                                         text = "Custom Contribution",
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 14.sp,
-                                        color = MaterialTheme.colorScheme.onSurface
+                                        color = Color(0xFF1E293B)
                                     )
                                 }
                                 Box(
                                     modifier = Modifier
                                         .clip(CircleShape)
                                         .background(
-                                            if (selectedTier == 4) Color(0xFF7C3AED)
+                                            if (selectedTier == 4) Color(0xFF6366F1)
                                             else Color.Transparent
                                         )
                                         .border(
                                             1.5.dp,
-                                            if (selectedTier == 4) Color(0xFF7C3AED)
-                                            else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                                            if (selectedTier == 4) Color(0xFF6366F1)
+                                            else Color(0xFFCBD5E1),
                                             CircleShape
                                         )
                                         .size(20.dp),
@@ -336,60 +370,120 @@ fun DonateScreen(
 
                 Spacer(modifier = Modifier.height(28.dp))
 
-                // Elegant interactive card sandbox display
+                // Realistic Holographic dark credit card simulation
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(180.dp)
-                        .clip(RoundedCornerShape(20.dp))
+                        .height(190.dp)
+                        .clip(RoundedCornerShape(22.dp))
                         .background(
                             Brush.linearGradient(
-                                listOf(Color(0xFF1E293B), Color(0xFF0F172A))
+                                colors = listOf(Color(0xFF1E1E2E), Color(0xFF11111B), Color(0xFF313244)),
+                                start = Offset.Zero,
+                                end = Offset.Infinite
                             )
                         )
-                        .shadow(6.dp, RoundedCornerShape(20.dp))
-                        .padding(20.dp)
+                        .border(1.dp, Color.White.copy(0.15f), RoundedCornerShape(22.dp))
+                        .shadow(12.dp, RoundedCornerShape(22.dp))
+                        .padding(24.dp)
                 ) {
+                    // Hologram mesh background effect
+                    Canvas(modifier = Modifier.fillMaxSize()) {
+                        drawCircle(
+                            color = Color(0xFFEC4899).copy(alpha = 0.08f),
+                            radius = 260f,
+                            center = Offset(size.width, 0f)
+                        )
+                        drawCircle(
+                            color = Color(0xFF4F46E5).copy(alpha = 0.08f),
+                            radius = 260f,
+                            center = Offset(0f, size.height)
+                        )
+                    }
+                    
                     Column(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.SpaceBetween) {
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                            Text("Secure Premium Sandbox", color = Color.White.copy(alpha = 0.6f), fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                            Icon(Icons.Filled.Nfc, contentDescription = null, tint = Color.White.copy(alpha = 0.8f))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "DOCS SUITE PREMIUM",
+                                color = Color.White.copy(alpha = 0.4f),
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 1.sp
+                            )
+                            Icon(
+                                imageVector = Icons.Filled.Nfc,
+                                contentDescription = null,
+                                tint = Color.White.copy(alpha = 0.7f),
+                                modifier = Modifier.size(24.dp)
+                            )
                         }
 
                         // Gold card chip simulator
                         Box(
                             modifier = Modifier
-                                .size(36.dp, 28.dp)
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(Color(0xFFFFDF70))
+                                .size(40.dp, 30.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(
+                                    Brush.linearGradient(
+                                        listOf(Color(0xFFFDE047), Color(0xFFCA8A04))
+                                    )
+                                )
+                                .border(1.dp, Color.White.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
                         )
 
-                        Column {
-                            Text(
-                                text = "SUPPORT AMOUNT",
-                                fontSize = 9.sp,
-                                color = Color.White.copy(alpha = 0.5f),
-                                fontWeight = FontWeight.Bold
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = "$${String.format("%.2f", currentAmount)} USD",
-                                fontSize = 22.sp,
-                                color = Color.White,
-                                fontWeight = FontWeight.Black
-                            )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.Bottom
+                        ) {
+                            Column {
+                                Text(
+                                    text = "SUPPORT SPONSORSHIP",
+                                    fontSize = 8.sp,
+                                    color = Color.White.copy(alpha = 0.4f),
+                                    fontWeight = FontWeight.Bold,
+                                    letterSpacing = 1.sp
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = "$${String.format("%.2f", currentAmount)} USD",
+                                    fontSize = 24.sp,
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Black
+                                )
+                            }
+                            // Mastercard-style stylized double bubble logo
+                            Row {
+                                Box(
+                                    modifier = Modifier
+                                        .size(22.dp)
+                                        .clip(CircleShape)
+                                        .background(Color(0xFFF43F5E).copy(alpha = 0.85f))
+                                )
+                                Spacer(modifier = Modifier.width(-8.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .size(22.dp)
+                                        .clip(CircleShape)
+                                        .background(Color(0xFFF59E0B).copy(alpha = 0.85f))
+                                )
+                            }
                         }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(26.dp))
 
-                // Support Payment Button
+                // Premium Support Payment Button
                 Button(
                     onClick = {
                         scope.launch {
                             isProcessing = true
-                            delay(1800) // Beautiful transaction validation simulator
+                            delay(1800) // validation simulation
                             isProcessing = false
                             confettiActive = true
                             showThankYouDialog = true
@@ -398,10 +492,11 @@ fun DonateScreen(
                     enabled = currentAmount > 0.0 && !isProcessing,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(56.dp),
+                        .height(58.dp)
+                        .shadow(4.dp, RoundedCornerShape(16.dp)),
                     shape = RoundedCornerShape(16.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF7C3AED),
+                        containerColor = Color(0xFF4F46E5),
                         contentColor = Color.White
                     )
                 ) {
@@ -415,19 +510,19 @@ fun DonateScreen(
                         Icon(Icons.Filled.Payment, contentDescription = null)
                         Spacer(modifier = Modifier.width(12.dp))
                         Text(
-                            text = if (currentAmount > 0.0) "Transact $${String.format("%.2f", currentAmount)}" else "Support Application",
-                            fontWeight = FontWeight.Bold,
+                            text = if (currentAmount > 0.0) "Contribute $${String.format("%.2f", currentAmount)}" else "Support Application",
+                            fontWeight = FontWeight.ExtraBold,
                             fontSize = 16.sp
                         )
                     }
                 }
 
-                Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = Modifier.height(18.dp))
 
                 Text(
-                    text = "No real money is charged. Fully offline sandbox demo environment.",
+                    text = "Offline demo sandbox environment. No real funds are moved.",
                     fontSize = 11.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                    color = Color(0xFF94A3B8),
                     textAlign = TextAlign.Center
                 )
 
@@ -456,35 +551,39 @@ fun DonateScreen(
             confirmButton = {
                 Button(
                     onClick = { showThankYouDialog = false },
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4F46E5))
                 ) {
-                    Text("You're Welcome!")
+                    Text("You're Welcome!", fontWeight = FontWeight.Bold)
                 }
             },
             icon = {
                 Icon(
                     imageVector = Icons.Filled.CardGiftcard,
                     contentDescription = null,
-                    tint = Color(0xFF7C3AED),
-                    modifier = Modifier.size(40.dp)
+                    tint = Color(0xFFEC4899),
+                    modifier = Modifier.size(44.dp)
                 )
             },
             title = {
                 Text(
-                    "Support Received!",
-                    fontWeight = FontWeight.Bold,
+                    "Sponsorship Received!",
+                    fontWeight = FontWeight.ExtraBold,
+                    fontSize = 18.sp,
                     textAlign = TextAlign.Center
                 )
             },
             text = {
                 Text(
-                    "Your generous contribution of $${String.format("%.2f", currentAmount)} helps provide crucial education, food, and shelter for children in Africa. Thank you for making a real difference in their lives!",
+                    "Your incredibly generous support of $${String.format("%.2f", currentAmount)} makes a huge difference! We really appreciate your backing in building premium utility applications.",
                     textAlign = TextAlign.Center,
-                    fontSize = 14.sp
+                    fontSize = 13.sp,
+                    lineHeight = 20.sp,
+                    color = Color(0xFF475569)
                 )
             },
             shape = RoundedCornerShape(24.dp),
-            containerColor = MaterialTheme.colorScheme.surface
+            containerColor = Color.White
         )
     }
 }
@@ -493,7 +592,8 @@ data class DonateTier(
     val name: String,
     val amount: Double,
     val description: String,
-    val iconColor: Color
+    val iconColor: Color,
+    val icon: ImageVector
 )
 
 @Composable
@@ -502,19 +602,19 @@ fun TierRowItem(
     selected: Boolean,
     onClick: () -> Unit
 ) {
-    val bg = MaterialTheme.colorScheme.surface
-    val borderCol = if (selected) Color(0xFF7C3AED) else MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
-
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .background(bg)
+            .clip(RoundedCornerShape(18.dp))
+            .background(Color.White)
             .border(
-                BorderStroke(if (selected) 2.dp else 1.dp, borderCol),
-                RoundedCornerShape(16.dp)
+                BorderStroke(
+                    width = if (selected) 2.dp else 1.dp,
+                    color = if (selected) Color(0xFF6366F1) else Color(0xFFE2E8F0)
+                ),
+                RoundedCornerShape(18.dp)
             )
-            .shadow(if (selected) 4.dp else 1.dp, RoundedCornerShape(16.dp))
+            .shadow(if (selected) 6.dp else 1.dp, RoundedCornerShape(18.dp))
             .clickable { onClick() }
             .padding(16.dp)
     ) {
@@ -526,19 +626,13 @@ fun TierRowItem(
             Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
                 Box(
                     modifier = Modifier
-                        .size(42.dp)
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(tier.iconColor.copy(alpha = 0.15f)),
+                        .size(44.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(tier.iconColor.copy(alpha = 0.12f)),
                     contentAlignment = Alignment.Center
                 ) {
-                    val icon = when (tier.amount.toInt()) {
-                        2 -> Icons.Filled.Coffee
-                        5 -> Icons.Filled.Cake
-                        10 -> Icons.Filled.LocalPizza
-                        else -> Icons.Filled.WorkspacePremium
-                    }
                     Icon(
-                        imageVector = icon,
+                        imageVector = tier.icon,
                         contentDescription = tier.name,
                         tint = tier.iconColor,
                         modifier = Modifier.size(22.dp)
@@ -550,13 +644,13 @@ fun TierRowItem(
                         text = tier.name,
                         fontWeight = FontWeight.Bold,
                         fontSize = 14.sp,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = Color(0xFF1E293B)
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
                         text = tier.description,
                         fontSize = 11.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = Color(0xFF64748B)
                     )
                 }
             }
@@ -564,21 +658,21 @@ fun TierRowItem(
                 Text(
                     text = "$${String.format("%.0f", tier.amount)}",
                     fontWeight = FontWeight.Black,
-                    fontSize = 16.sp,
-                    color = Color(0xFF7C3AED)
+                    fontSize = 17.sp,
+                    color = Color(0xFF4F46E5)
                 )
                 Spacer(modifier = Modifier.width(12.dp))
                 Box(
                     modifier = Modifier
                         .clip(CircleShape)
                         .background(
-                            if (selected) Color(0xFF7C3AED)
+                            if (selected) Color(0xFF6366F1)
                             else Color.Transparent
                         )
                         .border(
                             1.5.dp,
-                            if (selected) Color(0xFF7C3AED)
-                            else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                            if (selected) Color(0xFF6366F1)
+                            else Color(0xFFCBD5E1),
                             CircleShape
                         )
                         .size(20.dp),

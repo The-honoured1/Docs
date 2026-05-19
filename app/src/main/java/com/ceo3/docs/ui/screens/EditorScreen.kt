@@ -99,10 +99,10 @@ class EditorViewModel(application: android.app.Application) : androidx.lifecycle
                     type = doc.type.uppercase()
                     isStarred = doc.isPinned
 
-                    // Load text if not PDF
+                    // Load text if not PDF and not PNG/JPG/JPEG image
                     val context = getApplication<android.app.Application>()
                     val file = File(context.filesDir, "doc_${doc.id}.${doc.type.lowercase()}")
-                    if (type != "PDF") {
+                    if (type != "PDF" && type != "PNG" && type != "JPG" && type != "JPEG") {
                         if (file.exists()) {
                             textContent = file.readText()
                         } else {
@@ -170,8 +170,10 @@ class EditorViewModel(application: android.app.Application) : androidx.lifecycle
         viewModelScope.launch(Dispatchers.IO) {
             val context = getApplication<android.app.Application>()
             val actualId = if (docId == "new_blank_document") UUID.randomUUID().toString() else docId
-            val file = File(context.filesDir, "doc_${actualId}.${type.lowercase()}")
-            file.writeText(textContent)
+            if (type != "PNG" && type != "JPG" && type != "JPEG") {
+                val file = File(context.filesDir, "doc_${actualId}.${type.lowercase()}")
+                file.writeText(textContent)
+            }
 
             // Upsert in database
             val existing = dao.getDocumentById(actualId)
@@ -324,6 +326,9 @@ fun EditorScreen(
     } else if (viewModel.type == "PPT" || viewModel.type == "PPTX") {
         // --- POWERPOINT SLIDE DECK INTERACTIVE VIEW/EDITOR ---
         PptEditorView(viewModel = viewModel, documentId = documentId, onNavigateBack = onNavigateBack)
+    } else if (viewModel.type == "PNG" || viewModel.type == "JPG" || viewModel.type == "JPEG") {
+        // --- IMAGE VIEWER / EXPORTER ---
+        ImageViewerView(viewModel = viewModel, documentId = documentId, onNavigateBack = onNavigateBack)
     } else {
         // --- SCREEN 3: DOCX / TXT Rich-text Editor ---
         RichTextEditorView(viewModel = viewModel, documentId = documentId, onNavigateBack = onNavigateBack)
@@ -1211,5 +1216,240 @@ fun toggleChecklistItem(lineIndex: Int, checked: Boolean, viewModel: EditorViewM
             }
         }
         viewModel.updateText(lines.joinToString("\n"))
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ImageViewerView(
+    viewModel: EditorViewModel,
+    documentId: String,
+    onNavigateBack: () -> Unit
+) {
+    val context = LocalContext.current
+    val file = File(context.filesDir, "doc_${documentId}.${viewModel.type.lowercase()}")
+    var bitmap by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
+
+    LaunchedEffect(file) {
+        if (file.exists()) {
+            bitmap = android.graphics.BitmapFactory.decodeFile(file.absolutePath)
+        }
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = {
+                    Text(
+                        text = viewModel.title,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                },
+                navigationIcon = {
+                    IconButton(onClick = onNavigateBack) {
+                        Icon(Icons.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                },
+                actions = {
+                    IconButton(onClick = {
+                        if (file.exists()) {
+                            saveImageToGallery(context, file, viewModel.title)
+                        } else {
+                            Toast.makeText(context, "Image file not found", Toast.LENGTH_SHORT).show()
+                        }
+                    }) {
+                        Icon(Icons.Filled.Download, contentDescription = "Download Image")
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
+            )
+        }
+    ) { paddingValues ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+                .background(Color(0xFFF3F4F6)) // Light grey desk workspace
+                .padding(16.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                // Image Canvas Card
+                Card(
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    modifier = Modifier
+                        .fillMaxWidth(0.95f)
+                        .aspectRatio(1f)
+                        .shadow(6.dp, RoundedCornerShape(12.dp))
+                        .padding(8.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color(0xFFE5E7EB)), // Light gray checkerboard area
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (bitmap != null) {
+                            androidx.compose.foundation.Image(
+                                bitmap = bitmap!!.asImageBitmap(),
+                                contentDescription = "Document Image Preview",
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(8.dp)
+                            )
+                        } else {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.BrokenImage,
+                                    contentDescription = "Image Load Error",
+                                    tint = Color.Gray,
+                                    modifier = Modifier.size(48.dp)
+                                )
+                                Text(
+                                    text = "Failed to load image preview",
+                                    fontSize = 13.sp,
+                                    color = Color.Gray
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Info details card
+                Card(
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    modifier = Modifier
+                        .fillMaxWidth(0.95f)
+                        .border(1.dp, Color.LightGray.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column {
+                                Text(
+                                    text = "Format & Source",
+                                    fontSize = 11.sp,
+                                    color = Color.Gray,
+                                    fontWeight = FontWeight.Medium
+                                )
+                                Text(
+                                    text = "${viewModel.type} Image Document",
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF1E293B)
+                                )
+                            }
+                            // Accent badge
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(AccentRose.copy(alpha = 0.15f))
+                                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                            ) {
+                                Text(
+                                    text = viewModel.type,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = AccentRose
+                                )
+                            }
+                        }
+
+                        if (bitmap != null) {
+                            HorizontalDivider(color = Color.LightGray.copy(alpha = 0.3f))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Column {
+                                    Text("Resolution", fontSize = 11.sp, color = Color.Gray)
+                                    Text("${bitmap!!.width} x ${bitmap!!.height}", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color(0xFF334155))
+                                }
+                                Column {
+                                    Text("File Size", fontSize = 11.sp, color = Color.Gray)
+                                    val sizeKb = file.length() / 1024
+                                    Text(
+                                        text = if (sizeKb > 1024) "${"%.2f".format(sizeKb / 1024f)} MB" else "${sizeKb} KB",
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF334155)
+                                    )
+                                }
+                            }
+                        }
+
+                        Button(
+                            onClick = {
+                                if (file.exists()) {
+                                    saveImageToGallery(context, file, viewModel.title)
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = AccentRose),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(46.dp)
+                        ) {
+                            Icon(Icons.Filled.Download, contentDescription = null, tint = Color.White)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Export to Device Gallery / Downloads", color = Color.White, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+fun saveImageToGallery(context: android.content.Context, file: File, title: String) {
+    try {
+        val resolver = context.contentResolver
+        val contentValues = android.contentValues.ContentValues().apply {
+            put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, title)
+            put(android.provider.MediaStore.MediaColumns.MIME_TYPE, "image/png")
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH, android.os.Environment.DIRECTORY_PICTURES + "/DocsApp")
+                put(android.provider.MediaStore.MediaColumns.IS_PENDING, 1)
+            }
+        }
+        val imageUri = resolver.insert(android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI, contentValues)
+        if (imageUri != null) {
+            resolver.openOutputStream(imageUri)?.use { output ->
+                file.inputStream().use { input ->
+                    input.copyTo(output)
+                }
+            }
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                contentValues.clear()
+                contentValues.put(android.provider.MediaStore.MediaColumns.IS_PENDING, 0)
+                resolver.update(imageUri, contentValues, null, null)
+            }
+            android.widget.Toast.makeText(context, "Saved to Pictures/DocsApp successfully!", android.widget.Toast.LENGTH_LONG).show()
+        } else {
+            val downloadsDir = android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS)
+            val destFile = File(downloadsDir, title)
+            file.copyTo(destFile, overwrite = true)
+            android.widget.Toast.makeText(context, "Saved to Downloads/${title}!", android.widget.Toast.LENGTH_LONG).show()
+        }
+    } catch (e: Exception) {
+        android.widget.Toast.makeText(context, "Export failed: ${e.localizedMessage}", android.widget.Toast.LENGTH_LONG).show()
     }
 }
