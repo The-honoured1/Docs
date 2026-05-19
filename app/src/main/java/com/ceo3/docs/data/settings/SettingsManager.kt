@@ -21,6 +21,7 @@ class SettingsManager(private val context: Context) {
         
         val REQUIRE_PASSCODE = booleanPreferencesKey("require_passcode")
         val USE_BIOMETRICS = booleanPreferencesKey("use_biometrics")
+        val PASSCODE = stringPreferencesKey("passcode")
     }
 
     val userNameFlow: Flow<String> = context.dataStore.data.map { preferences ->
@@ -77,5 +78,13 @@ class SettingsManager(private val context: Context) {
 
     suspend fun setUseBiometrics(enabled: Boolean) {
         context.dataStore.edit { preferences -> preferences[USE_BIOMETRICS] = enabled }
+    }
+
+    val passcodeFlow: Flow<String> = context.dataStore.data.map { preferences ->
+        preferences[PASSCODE] ?: ""
+    }
+
+    suspend fun setPasscode(passcode: String) {
+        context.dataStore.edit { preferences -> preferences[PASSCODE] = passcode }
     }
 }

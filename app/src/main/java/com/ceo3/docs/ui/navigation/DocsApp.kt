@@ -101,17 +101,53 @@ fun DocsApp(settingsManager: SettingsManager? = null) {
     // Passcode logic
     var isUnlocked by remember { mutableStateOf(false) }
     val requirePasscode = settingsManager?.requirePasscodeFlow?.collectAsState(initial = false)?.value ?: false
+    val savedPasscode = settingsManager?.passcodeFlow?.collectAsState(initial = "")?.value ?: ""
     
     if (requirePasscode && !isUnlocked) {
-        // Simple Lock Screen
+        var enteredPin by remember { mutableStateOf("") }
+        var isError by remember { mutableStateOf(false) }
+
         Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Icon(Icons.Filled.Settings, contentDescription = "Lock", modifier = Modifier.size(64.dp), tint = MaterialTheme.colorScheme.primary)
                 Spacer(modifier = Modifier.height(16.dp))
                 Text("App is locked", fontSize = 24.sp, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(32.dp))
-                Button(onClick = { isUnlocked = true }) {
-                    Text("Unlock (Mock)")
+                
+                androidx.compose.foundation.text.BasicTextField(
+                    value = enteredPin,
+                    onValueChange = { 
+                        if (it.length <= 4 && it.all { char -> char.isDigit() }) {
+                            enteredPin = it
+                            isError = false
+                            if (it.length == 4) {
+                                if (it == savedPasscode || savedPasscode.isEmpty()) {
+                                    isUnlocked = true
+                                } else {
+                                    isError = true
+                                    enteredPin = ""
+                                }
+                            }
+                        }
+                    },
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.NumberPassword)
+                ) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        repeat(4) { index ->
+                            val isFilled = index < enteredPin.length
+                            Box(
+                                modifier = Modifier
+                                    .size(24.dp)
+                                    .clip(CircleShape)
+                                    .background(if (isFilled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant)
+                            )
+                        }
+                    }
+                }
+                
+                if (isError) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text("Incorrect PIN", color = MaterialTheme.colorScheme.error)
                 }
             }
         }

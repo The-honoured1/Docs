@@ -80,10 +80,10 @@ fun DonateScreen(
     )
 
     val tiers = listOf(
-        DonateTier("☕ Fresh Coffee", 2.0, "Keeps developers awake & writing code", Color(0xFFFFB84D)),
-        DonateTier("🍰 Cake Slice", 5.0, "Brings happiness & sweet features", Color(0xFFFFAA3B)),
-        DonateTier("🍕 Pizza Pack", 10.0, "Fuels robust PDF tools development", Color(0xFFE57373)),
-        DonateTier("👑 Gold Patron", 25.0, "Includes your name in our contributors", Color(0xFFCFC3FF))
+        DonateTier("📚 School Supplies", 2.0, "Provides notebooks and pens for a student", Color(0xFFFFB84D)),
+        DonateTier("🍲 Daily Meals", 5.0, "Feeds a child nutritious meals for a week", Color(0xFFFFAA3B)),
+        DonateTier("🏫 Classroom Fund", 10.0, "Contributes to building safe learning spaces", Color(0xFFE57373)),
+        DonateTier("🎓 Education Sponsor", 25.0, "Sponsors a full month of quality education", Color(0xFFCFC3FF))
     )
 
     val currentAmount = when (selectedTier) {
@@ -139,7 +139,7 @@ fun DonateScreen(
             CenterAlignedTopAppBar(
                 title = {
                     Text(
-                        "Donate & Support",
+                        "Help Children in Africa",
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onBackground
                     )
@@ -202,7 +202,7 @@ fun DonateScreen(
                         }
                         Spacer(modifier = Modifier.height(16.dp))
                         Text(
-                            text = "SUPPORT THE DOCS REVOLUTION",
+                            text = "SUPPORT CHILDREN IN AFRICA",
                             fontSize = 18.sp,
                             fontWeight = FontWeight.ExtraBold,
                             color = Color.White,
@@ -211,7 +211,7 @@ fun DonateScreen(
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = "We believe in professional tools for everyone with absolutely no paywalls, hidden premiums, or ad interruptions. Scanning, spellchecking, translations, and PDF editing are 100% free. If our application adds value to your life, consider backing us!",
+                            text = "Every contribution helps provide essential education, nutritious meals, and safe shelter for children in Africa. Together, we can build a brighter future. If our application has added value to your life, please consider giving back to those in need.",
                             fontSize = 12.sp,
                             color = Color.White.copy(alpha = 0.9f),
                             textAlign = TextAlign.Center,
@@ -478,7 +478,7 @@ fun DonateScreen(
             },
             text = {
                 Text(
-                    "Your generous backing of $${String.format("%.2f", currentAmount)} helps keep professional office and OCR tools available for everyone around the world for free!",
+                    "Your generous contribution of $${String.format("%.2f", currentAmount)} helps provide crucial education, food, and shelter for children in Africa. Thank you for making a real difference in their lives!",
                     textAlign = TextAlign.Center,
                     fontSize = 14.sp
                 )
