@@ -49,22 +49,26 @@ class HomeViewModel(application: android.app.Application) : AndroidViewModel(app
     init {
         viewModelScope.launch {
             dao.getAllDocuments().collect { docs ->
+                val sortedDocs = docs.sortedByDescending { it.lastModified }.map { it.toModel() }
                 _uiState.value = HomeUiState(
                     pinnedDocs = docs.filter { it.isPinned }.map { it.toModel() },
-                    recentDocs = docs.filter { !it.isPinned }.map { it.toModel() }
+                    recentDocs = sortedDocs,
+                    allDocs = sortedDocs
                 )
             }
         }
     }
 
     private fun com.ceo3.docs.data.local.DocumentEntity.toModel(): DocumentModel {
-        return DocumentModel(id, title, type, "Last modified: $lastModified", isPinned)
+        val dateLabel = android.text.format.DateUtils.getRelativeTimeSpanString(lastModified).toString()
+        return DocumentModel(id, title, type, dateLabel, isPinned)
     }
 }
 
 data class HomeUiState(
     val pinnedDocs: List<DocumentModel> = emptyList(),
-    val recentDocs: List<DocumentModel> = emptyList()
+    val recentDocs: List<DocumentModel> = emptyList(),
+    val allDocs: List<DocumentModel> = emptyList()
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -90,106 +94,57 @@ fun HomeScreen(
                 .padding(paddingValues)
                 .verticalScroll(scrollState)
         ) {
-            // ── Greeting ──────────────────────────────────────────────────
-            Column(
+            // ── Compact Header ─────────────────────────────────────────────
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 24.dp, vertical = 32.dp)
+                    .padding(start = 24.dp, end = 24.dp, top = 24.dp, bottom = 16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
-                    text = "Welcome,",
-                    style = MaterialTheme.typography.headlineMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Text(
-                    text = "What would you like\nto do?",
-                    style = MaterialTheme.typography.displayMedium,
+                    text = "Docs",
+                    style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.ExtraBold),
                     color = MaterialTheme.colorScheme.onBackground
                 )
+                Icon(
+                    imageVector = Icons.Outlined.Folder,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(28.dp)
+                )
             }
 
-            // ── Donation Banner ───────────────────────────────────────────
-            Card(
+            // ── Simplified Action Grid ────────────────────────────────────
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 24.dp)
-                    .padding(bottom = 24.dp)
-                    .clickable { /* TODO: open donation URL */ },
-                shape = RoundedCornerShape(24.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
-                )
+                    .padding(horizontal = 24.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                Row(
-                    modifier = Modifier.padding(20.dp).fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(48.dp)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.surface),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.Favorite,
-                            contentDescription = "Donate",
-                            tint = Color(0xFFFF5252),
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(16.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "Free Forever, No Ads",
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onBackground
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = "We monetize through donations for poor children in Africa. Tap to support us.",
-                            fontSize = 12.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            lineHeight = 16.sp
-                        )
-                    }
-                }
-            }
-
-            // ── Action Grid ───────────────────────────────────────────────
-            Column(
-                modifier = Modifier.padding(horizontal = 24.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    ActionCard(
-                        modifier = Modifier.weight(1f).aspectRatio(0.95f),
-                        title = "Scan",
-                        subtitle = "Documents, ID cards...",
-                        icon = Icons.Outlined.DocumentScanner,
-                        backgroundColor = MaterialTheme.colorScheme.surfaceVariant,
-                        onClick = onNavigateToScanner
-                    )
-                    ActionCard(
-                        modifier = Modifier.weight(1f).aspectRatio(0.95f),
-                        title = "Edit",
-                        subtitle = "Sign, add text, mark...",
-                        icon = Icons.Outlined.Edit,
-                        backgroundColor = MaterialTheme.colorScheme.secondary.copy(alpha = 0.7f),
-                        onClick = { documentPickerLauncher.launch(arrayOf("application/pdf", "image/*", "text/plain")) }
-                    )
-                }
                 ActionCard(
-                    modifier = Modifier.fillMaxWidth().height(110.dp),
-                    title = "Convert",
-                    subtitle = "Convert PDF, Word documents, images, and raw text",
-                    icon = Icons.Outlined.Output,
-                    backgroundColor = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.7f),
-                    onClick = { documentPickerLauncher.launch(arrayOf("*/*")) }
+                    modifier = Modifier.weight(1f).aspectRatio(0.95f),
+                    title = "Scan",
+                    subtitle = "Scan pages, auto-crop & OCR",
+                    icon = Icons.Outlined.DocumentScanner,
+                    backgroundColor = MaterialTheme.colorScheme.surfaceVariant,
+                    onClick = onNavigateToScanner
+                )
+                ActionCard(
+                    modifier = Modifier.weight(1f).aspectRatio(0.95f),
+                    title = "Open / Edit",
+                    subtitle = "View or sign PDF / Word files",
+                    icon = Icons.Outlined.OpenInNew,
+                    backgroundColor = MaterialTheme.colorScheme.secondary.copy(alpha = 0.2f),
+                    onClick = {
+                        documentPickerLauncher.launch(
+                            arrayOf(
+                                "application/pdf",
+                                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                                "application/msword"
+                            )
+                        )
+                    }
                 )
             }
 
@@ -220,7 +175,7 @@ fun HomeScreen(
                     Box(modifier = Modifier.fillMaxWidth()) {
                         if (searchQuery.isEmpty()) {
                             Text(
-                                "Search files",
+                                "Search files…",
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 fontSize = 16.sp
                             )
@@ -252,12 +207,53 @@ fun HomeScreen(
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            // ── Recent Files ──────────────────────────────────────────────
-            val displayDocs = state.recentDocs.filter {
-                searchQuery.isEmpty() || it.title.contains(searchQuery, ignoreCase = true)
-            }
+            // ── Recent Files / Search Results ─────────────────────────────
+            if (searchQuery.isNotEmpty()) {
+                val searchResults = state.allDocs.filter {
+                    it.title.contains(searchQuery, ignoreCase = true)
+                }
+                Text(
+                    text = "Search Results",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onBackground,
+                    modifier = Modifier.padding(horizontal = 24.dp)
+                )
+                Spacer(modifier = Modifier.height(16.dp))
 
-            if (displayDocs.isNotEmpty() || searchQuery.isNotEmpty()) {
+                if (searchResults.isNotEmpty()) {
+                    LazyRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        contentPadding = PaddingValues(horizontal = 24.dp),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        items(searchResults) { doc ->
+                            RecentFileCard(doc = doc, onClick = { onNavigateToEditor(doc.id) })
+                        }
+                    }
+                } else {
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 24.dp)
+                            .height(120.dp),
+                        shape = RoundedCornerShape(24.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                    ) {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "None",
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+            } else {
                 Text(
                     text = "Recent files",
                     fontSize = 20.sp,
@@ -266,13 +262,37 @@ fun HomeScreen(
                     modifier = Modifier.padding(horizontal = 24.dp)
                 )
                 Spacer(modifier = Modifier.height(16.dp))
-                LazyRow(
-                    modifier = Modifier.fillMaxWidth(),
-                    contentPadding = PaddingValues(horizontal = 24.dp),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    items(displayDocs) { doc ->
-                        RecentFileCard(doc = doc, onClick = { onNavigateToEditor(doc.id) })
+
+                if (state.recentDocs.isNotEmpty()) {
+                    LazyRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        contentPadding = PaddingValues(horizontal = 24.dp),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        items(state.recentDocs) { doc ->
+                            RecentFileCard(doc = doc, onClick = { onNavigateToEditor(doc.id) })
+                        }
+                    }
+                } else {
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 24.dp)
+                            .height(120.dp),
+                        shape = RoundedCornerShape(24.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                    ) {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "None",
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
                 }
             }
@@ -304,8 +324,8 @@ fun ActionCard(
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f),
-                modifier = Modifier.size(28.dp)
+                tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
+                modifier = Modifier.size(32.dp)
             )
             Spacer(modifier = Modifier.weight(1f))
             Text(
@@ -317,10 +337,10 @@ fun ActionCard(
             Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = subtitle,
-                fontSize = 11.sp,
+                fontSize = 12.sp,
                 color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
                 textAlign = TextAlign.Start,
-                lineHeight = 14.sp,
+                lineHeight = 15.sp,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis
             )
@@ -334,7 +354,13 @@ fun RecentFileCard(doc: DocumentModel, onClick: () -> Unit) {
         "XLS", "XLSX" -> MaterialTheme.colorScheme.tertiary.copy(alpha = 0.3f)
         "JPG", "PNG"  -> MaterialTheme.colorScheme.secondary.copy(alpha = 0.3f)
         "DOC", "DOCX" -> MaterialTheme.colorScheme.secondary.copy(alpha = 0.5f)
+        "PDF"          -> MaterialTheme.colorScheme.error.copy(alpha = 0.15f)
         else           -> MaterialTheme.colorScheme.surface
+    }
+
+    val iconColor = when (doc.type.uppercase()) {
+        "PDF"          -> MaterialTheme.colorScheme.error
+        else           -> MaterialTheme.colorScheme.primary
     }
 
     Card(
@@ -350,7 +376,7 @@ fun RecentFileCard(doc: DocumentModel, onClick: () -> Unit) {
             Icon(
                 imageVector = Icons.Filled.Description,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
+                tint = iconColor,
                 modifier = Modifier.size(32.dp)
             )
             Spacer(modifier = Modifier.weight(1f))
@@ -364,7 +390,8 @@ fun RecentFileCard(doc: DocumentModel, onClick: () -> Unit) {
                 overflow = TextOverflow.Ellipsis
             )
             Spacer(modifier = Modifier.height(4.dp))
-            Text(text = doc.type, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(text = doc.type.uppercase(), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
+

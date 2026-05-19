@@ -1,20 +1,16 @@
 package com.ceo3.docs.ui.navigation
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.DocumentScanner
 import androidx.compose.material.icons.filled.Folder
-import androidx.compose.material.icons.outlined.Layers
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.outlined.Folder
+import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
@@ -25,13 +21,18 @@ import com.ceo3.docs.ui.screens.EditorScreen
 import com.ceo3.docs.ui.screens.FilesScreen
 import com.ceo3.docs.ui.screens.HomeScreen
 import com.ceo3.docs.ui.screens.ScannerScreen
-
+import java.net.URLDecoder
+import java.net.URLEncoder
+import java.nio.charset.StandardCharsets
 
 sealed class Screen(val route: String) {
     object Home    : Screen("home")
     object Files   : Screen("files")
     object Editor  : Screen("editor/{docId}") {
-        fun createRoute(docId: String) = "editor/$docId"
+        fun createRoute(docId: String): String {
+            val encoded = URLEncoder.encode(docId, StandardCharsets.UTF_8.toString())
+            return "editor/$encoded"
+        }
     }
     object Scanner : Screen("scanner")
 }
@@ -47,89 +48,71 @@ fun DocsApp() {
             val currentRoute = navBackStackEntry?.destination?.route
 
             val showBottomBar = currentRoute in listOf(
-                Screen.Home.route, Screen.Files.route
+                Screen.Home.route, Screen.Files.route, Screen.Scanner.route
             )
 
             if (showBottomBar) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 24.dp, vertical = 20.dp)
+                NavigationBar(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    tonalElevation = 8.dp
                 ) {
-                    // Pill nav
-                    Row(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(32.dp))
-                            .background(MaterialTheme.colorScheme.onBackground)
-                            .padding(horizontal = 24.dp, vertical = 14.dp),
-                        horizontalArrangement = Arrangement.spacedBy(28.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        NavIcon(
-                            icon = Icons.Outlined.Layers,
-                            label = "Home",
-                            selected = currentRoute == Screen.Home.route,
-                            onClick = {
-                                navController.navigate(Screen.Home.route) {
-                                    popUpTo(navController.graph.startDestinationId) { saveState = true }
-                                    launchSingleTop = true; restoreState = true
-                                }
+                    NavigationBarItem(
+                        selected = currentRoute == Screen.Home.route,
+                        onClick = {
+                            navController.navigate(Screen.Home.route) {
+                                popUpTo(navController.graph.startDestinationId) { saveState = true }
+                                launchSingleTop = true
+                                restoreState = true
                             }
-                        )
-                        NavIcon(
-                            icon = Icons.Filled.Folder,
-                            label = "Files",
-                            selected = currentRoute == Screen.Files.route,
-                            onClick = {
-                                navController.navigate(Screen.Files.route) {
-                                    popUpTo(navController.graph.startDestinationId) { saveState = true }
-                                    launchSingleTop = true; restoreState = true
-                                }
+                        },
+                        icon = {
+                            Icon(
+                                imageVector = if (currentRoute == Screen.Home.route) Icons.Filled.Home else Icons.Outlined.Home,
+                                contentDescription = "Home"
+                            )
+                        },
+                        label = { Text("Home") }
+                    )
+                    NavigationBarItem(
+                        selected = currentRoute == Screen.Scanner.route,
+                        onClick = {
+                            navController.navigate(Screen.Scanner.route) {
+                                popUpTo(navController.graph.startDestinationId) { saveState = true }
+                                launchSingleTop = true
+                                restoreState = true
                             }
-                        )
-                    }
-
-                    // Scan FAB
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.CenterEnd)
-                            .size(56.dp)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.primary)
-                            .clickable { navController.navigate(Screen.Scanner.route) },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            Icons.Filled.Add,
-                            contentDescription = "Scan / Add",
-                            tint = MaterialTheme.colorScheme.onPrimary,
-                            modifier = Modifier.size(28.dp)
-                        )
-                    }
+                        },
+                        icon = {
+                            Icon(
+                                imageVector = Icons.Filled.DocumentScanner,
+                                contentDescription = "Scan"
+                            )
+                        },
+                        label = { Text("Scan") }
+                    )
+                    NavigationBarItem(
+                        selected = currentRoute == Screen.Files.route,
+                        onClick = {
+                            navController.navigate(Screen.Files.route) {
+                                popUpTo(navController.graph.startDestinationId) { saveState = true }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
+                        },
+                        icon = {
+                            Icon(
+                                imageVector = if (currentRoute == Screen.Files.route) Icons.Filled.Folder else Icons.Outlined.Folder,
+                                contentDescription = "Files"
+                            )
+                        },
+                        label = { Text("Files") }
+                    )
                 }
             }
         }
     ) { innerPadding ->
         DocsNavHost(navController = navController, modifier = Modifier.padding(innerPadding))
     }
-}
-
-@Composable
-private fun NavIcon(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    label: String,
-    selected: Boolean,
-    onClick: () -> Unit
-) {
-    val tint = if (selected) MaterialTheme.colorScheme.background else MaterialTheme.colorScheme.onSurfaceVariant
-    Icon(
-        imageVector = icon,
-        contentDescription = label,
-        tint = tint,
-        modifier = Modifier
-            .size(26.dp)
-            .clickable(onClick = onClick)
-    )
 }
 
 @Composable
@@ -151,7 +134,8 @@ fun DocsNavHost(navController: NavHostController, modifier: Modifier = Modifier)
             )
         }
         composable(Screen.Editor.route) { backStackEntry ->
-            val docId = backStackEntry.arguments?.getString("docId") ?: ""
+            val encodedDocId = backStackEntry.arguments?.getString("docId") ?: ""
+            val docId = URLDecoder.decode(encodedDocId, StandardCharsets.UTF_8.toString())
             EditorScreen(
                 documentId     = docId,
                 onNavigateBack = { navController.popBackStack() }
@@ -159,9 +143,10 @@ fun DocsNavHost(navController: NavHostController, modifier: Modifier = Modifier)
         }
         composable(Screen.Scanner.route) {
             ScannerScreen(
-                onScanComplete = { navController.popBackStack() },
+                onScanComplete = { navController.navigate(Screen.Home.route) { popUpTo(0) } },
                 onCancel       = { navController.popBackStack() }
             )
         }
     }
 }
+

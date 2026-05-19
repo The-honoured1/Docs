@@ -261,36 +261,51 @@ fun FilesScreen(
                 modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp)
             )
 
-            // ── File list ─────────────────────────────────────────────────
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 24.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-                contentPadding = PaddingValues(bottom = 120.dp, top = 4.dp)
-            ) {
-                // Dummy data when empty
-                val showDummy = displayItems.isEmpty() && searchQuery.isEmpty()
-                if (showDummy) {
-                    val dummies = listOf(
-                        FileItem("d1", "Taxes 2024",           true,  4, "",     ""),
-                        FileItem("d2", "Travel Documents",     true,  2, "",     ""),
-                        FileItem("d3", "Contract_final.pdf",  false, 0, "PDF",  "Just now"),
-                        FileItem("d4", "Meeting_notes.txt",   false, 0, "TXT",  "Yesterday"),
-                        FileItem("d5", "Invoice_May_2026.pdf",false, 0, "PDF",  "2 days ago")
-                    )
-                    items(dummies) { item ->
-                        if (item.isFolder) {
-                            FolderItem(item = item, onClick = {})
-                        } else {
-                            FileListItem(
-                                item    = item,
-                                onClick = { onDocumentClick(item.id) },
-                                onDelete = {}
-                            )
+            // ── File list / Empty State ───────────────────────────────────
+            if (displayItems.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 24.dp, vertical = 40.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(140.dp),
+                        shape = RoundedCornerShape(24.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                    ) {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Folder,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                                    modifier = Modifier.size(36.dp)
+                                )
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Text(
+                                    text = "None",
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                         }
                     }
-                } else {
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 24.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    contentPadding = PaddingValues(bottom = 120.dp, top = 4.dp)
+                ) {
                     items(displayItems, key = { it.id }) { item ->
                         if (item.isFolder) {
                             FolderItem(item = item, onClick = {})
