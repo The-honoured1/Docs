@@ -4,8 +4,10 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DocumentScanner
 import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.GridOn
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.outlined.Folder
+import androidx.compose.material.icons.outlined.GridOn
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -17,16 +19,19 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.ceo3.docs.ui.screens.DonateScreen
 import com.ceo3.docs.ui.screens.EditorScreen
 import com.ceo3.docs.ui.screens.FilesScreen
 import com.ceo3.docs.ui.screens.HomeScreen
 import com.ceo3.docs.ui.screens.ScannerScreen
+import com.ceo3.docs.ui.screens.ToolsScreen
 import java.net.URLDecoder
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 
 sealed class Screen(val route: String) {
     object Home    : Screen("home")
+    object Tools   : Screen("tools")
     object Files   : Screen("files")
     object Editor  : Screen("editor/{docId}") {
         fun createRoute(docId: String): String {
@@ -35,6 +40,7 @@ sealed class Screen(val route: String) {
         }
     }
     object Scanner : Screen("scanner")
+    object Donate  : Screen("donate")
 }
 
 @Composable
@@ -48,7 +54,7 @@ fun DocsApp() {
             val currentRoute = navBackStackEntry?.destination?.route
 
             val showBottomBar = currentRoute in listOf(
-                Screen.Home.route, Screen.Files.route, Screen.Scanner.route
+                Screen.Home.route, Screen.Tools.route, Screen.Files.route, Screen.Scanner.route
             )
 
             if (showBottomBar) {
@@ -72,6 +78,23 @@ fun DocsApp() {
                             )
                         },
                         label = { Text("Home") }
+                    )
+                    NavigationBarItem(
+                        selected = currentRoute == Screen.Tools.route,
+                        onClick = {
+                            navController.navigate(Screen.Tools.route) {
+                                popUpTo(navController.graph.startDestinationId) { saveState = true }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
+                        },
+                        icon = {
+                            Icon(
+                                imageVector = if (currentRoute == Screen.Tools.route) Icons.Filled.GridOn else Icons.Outlined.GridOn,
+                                contentDescription = "Tools"
+                            )
+                        },
+                        label = { Text("Tools") }
                     )
                     NavigationBarItem(
                         selected = currentRoute == Screen.Scanner.route,
@@ -125,7 +148,15 @@ fun DocsNavHost(navController: NavHostController, modifier: Modifier = Modifier)
         composable(Screen.Home.route) {
             HomeScreen(
                 onNavigateToEditor  = { docId -> navController.navigate(Screen.Editor.createRoute(docId)) },
-                onNavigateToScanner = { navController.navigate(Screen.Scanner.route) }
+                onNavigateToScanner = { navController.navigate(Screen.Scanner.route) },
+                onNavigateToDonate  = { navController.navigate(Screen.Donate.route) }
+            )
+        }
+        composable(Screen.Tools.route) {
+            ToolsScreen(
+                onNavigateToScanner = { navController.navigate(Screen.Scanner.route) },
+                onNavigateToEditor  = { docId -> navController.navigate(Screen.Editor.createRoute(docId)) },
+                onNavigateToDonate  = { navController.navigate(Screen.Donate.route) }
             )
         }
         composable(Screen.Files.route) {
@@ -145,6 +176,11 @@ fun DocsNavHost(navController: NavHostController, modifier: Modifier = Modifier)
             ScannerScreen(
                 onScanComplete = { navController.navigate(Screen.Home.route) { popUpTo(0) } },
                 onCancel       = { navController.popBackStack() }
+            )
+        }
+        composable(Screen.Donate.route) {
+            DonateScreen(
+                onNavigateBack = { navController.popBackStack() }
             )
         }
     }
