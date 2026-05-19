@@ -1,152 +1,113 @@
 package com.ceo3.docs.ui.screens
 
-import android.Manifest
-import android.content.pm.PackageManager
-import android.os.Build
-import android.os.Environment
-import android.util.Log
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.*
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.BorderStroke
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.Folder
+import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.ceo3.docs.data.local.DocumentEntity
+import com.ceo3.docs.ui.theme.*
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
-import java.io.File
-import java.text.SimpleDateFormat
-import java.util.*
 
-// UI State for the Files Screen
 data class FilesUiState(
-    val documents: List<DocumentEntity> = emptyList()
+    val documents: List<DocumentEntity> = emptyList(),
+    val filteredDocuments: List<DocumentEntity> = emptyList(),
+    val selectedFolder: String? = null,
+    val selectedTag: String? = null
 )
 
-// Viewmodel representing the Files Screen business logic
 class FilesViewModel(application: android.app.Application) : androidx.lifecycle.AndroidViewModel(application) {
     private val dao = com.ceo3.docs.data.local.DocDatabase.getDatabase(application).documentDao()
     private val _uiState = MutableStateFlow(FilesUiState())
     val uiState: StateFlow<FilesUiState> = _uiState
 
     init {
-        refreshExternalDocuments()
-    }
-
-    fun refreshExternalDocuments() {
-        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+        viewModelScope.launch(Dispatchers.IO) {
             dao.getAllDocuments().collectLatest { dbList ->
-                val deviceList = scanDeviceDocuments(getApplication())
-                val combined = (dbList + deviceList).sortedByDescending { it.lastModified }
-                _uiState.value = FilesUiState(documents = combined)
+                _uiState.value = _uiState.value.copy(
+                    documents = dbList,
+                    filteredDocuments = filterList(dbList, _uiState.value.selectedFolder, _uiState.value.selectedTag)
+                )
             }
         }
     }
 
-    private fun scanDeviceDocuments(context: android.content.Context): List<DocumentEntity> {
-        val list = mutableListOf<DocumentEntity>()
-        val extensions = listOf("pdf", "docx", "doc", "txt")
-        val scanDirs = mutableListOf<File>()
-
-        try {
-            val downloads = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-            if (downloads != null && downloads.exists()) {
-                scanDirs.add(downloads)
-            }
-        } catch (e: Exception) {}
-
-        try {
-            val docs = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS)
-            if (docs != null && docs.exists()) {
-                scanDirs.add(docs)
-            }
-        } catch (e: Exception) {}
-
-        // Add standard fallback directories to be exceptionally thorough
-        val fallbackDownloads = File("/storage/emulated/0/Download")
-        if (fallbackDownloads.exists() && !scanDirs.contains(fallbackDownloads)) {
-            scanDirs.add(fallbackDownloads)
-        }
-        val fallbackDocs = File("/storage/emulated/0/Documents")
-        if (fallbackDocs.exists() && !scanDirs.contains(fallbackDocs)) {
-            scanDirs.add(fallbackDocs)
-        }
-
-        for (dir in scanDirs) {
-            try {
-                val files = dir.listFiles()
-                if (files != null) {
-                    for (file in files) {
-                        if (file.isFile && file.extension.lowercase() in extensions) {
-                            list.add(
-                                DocumentEntity(
-                                    id = file.absolutePath, // Absolute path serves as unique ID
-                                    title = file.nameWithoutExtension,
-                                    type = file.extension.uppercase(),
-                                    lastModified = file.lastModified(),
-                                    isPinned = false,
-                                    tags = "External,${dir.name}",
-                                    accentTheme = "classic",
-                                    accentColor = "blue"
-                                )
-                            )
-                        }
-                    }
-                }
-            } catch (e: Exception) {
-                Log.e("FilesViewModel", "Failed to scan folder ${dir.absolutePath}", e)
-            }
-        }
-        return list
+    fun selectFolder(folderName: String?) {
+        val folder = if (_uiState.value.selectedFolder == folderName) null else folderName
+        _uiState.value = _uiState.value.copy(
+            selectedFolder = folder,
+            filteredDocuments = filterList(_uiState.value.documents, folder, _uiState.value.selectedTag)
+        )
     }
 
-    fun deleteDocument(id: String) {
-        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-            if (id.startsWith("/")) {
-                try {
-                    val file = File(id)
-                    if (file.exists()) {
-                        file.delete()
-                    }
-                } catch (e: Exception) {
-                    Log.e("FilesViewModel", "Failed to delete external file $id", e)
-                }
-                refreshExternalDocuments()
-            } else {
-                dao.deleteDocument(id)
-            }
+    fun selectTag(tagName: String?) {
+        val tag = if (_uiState.value.selectedTag == tagName) null else tagName
+        _uiState.value = _uiState.value.copy(
+            selectedTag = tag,
+            filteredDocuments = filterList(_uiState.value.documents, _uiState.value.selectedFolder, tag)
+        )
+    }
+
+    private fun filterList(list: List<DocumentEntity>, folder: String?, tag: String?): List<DocumentEntity> {
+        var result = list
+        if (folder != null) {
+            result = result.filter { it.tags.contains(folder, ignoreCase = true) }
+        }
+        if (tag != null) {
+            result = result.filter { it.tags.contains(tag, ignoreCase = true) }
+        }
+        return result
+    }
+
+    fun togglePin(doc: DocumentEntity) {
+        viewModelScope.launch(Dispatchers.IO) {
+            dao.insertDocument(doc.copy(isPinned = !doc.isPinned))
         }
     }
 }
+
+data class FolderItem(
+    val name: String,
+    val color: Color,
+    val count: Int,
+    val isShared: Boolean = false,
+    val isStarred: Boolean = false
+)
+
+data class TagItem(
+    val name: String,
+    val color: Color
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -156,267 +117,412 @@ fun FilesScreen(
 ) {
     val state by viewModel.uiState.collectAsState()
     val context = LocalContext.current
-    var docToDelete by remember { mutableStateOf<DocumentEntity?>(null) }
 
-    var hasStoragePermission by remember {
-        mutableStateOf(
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                ContextCompat.checkSelfPermission(context, Manifest.permission.READ_MEDIA_IMAGES) ==
-                        PackageManager.PERMISSION_GRANTED
-            } else {
-                ContextCompat.checkSelfPermission(context, Manifest.permission.READ_EXTERNAL_STORAGE) ==
-                        PackageManager.PERMISSION_GRANTED
-            }
-        )
-    }
+    var selectedTab by remember { mutableStateOf(0) }
+    val tabs = listOf("All", "Folders", "Documents")
 
-    val storagePermLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { granted ->
-        hasStoragePermission = granted
-        viewModel.refreshExternalDocuments()
-    }
+    val foldersList = listOf(
+        FolderItem("Work", Color(0xFFF59E0B), 12, isShared = true, isStarred = true),
+        FolderItem("Personal", Color(0xFF10B981), 8),
+        FolderItem("Clients", Color(0xFF8B5CF6), 6, isShared = true),
+        FolderItem("Archive", Color(0xFF6B7280), 20)
+    )
 
-    // Proactively scan on resume or permission state check
-    LaunchedEffect(hasStoragePermission) {
-        viewModel.refreshExternalDocuments()
-    }
+    val tagsList = listOf(
+        TagItem("Important", Color(0xFFEF4444)),
+        TagItem("Finance", Color(0xFF10B981)),
+        TagItem("Marketing", Color(0xFF3B82F6)),
+        TagItem("Personal", Color(0xFF8B5CF6)),
+        TagItem("2024", Color(0xFFF59E0B))
+    )
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        "Document Manager",
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onBackground
-                    )
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background
-                )
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+    ) {
+        // --- Header ---
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp)
+                .padding(top = 56.dp, bottom = 12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Files",
+                fontSize = 28.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onBackground
             )
-        },
-        containerColor = MaterialTheme.colorScheme.background
-    ) { paddingValues ->
-        Column(
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                IconButton(onClick = { Toast.makeText(context, "Search Files", Toast.LENGTH_SHORT).show() }) {
+                    Icon(Icons.Filled.Search, contentDescription = "Search", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                IconButton(onClick = { Toast.makeText(context, "Sort / Filter", Toast.LENGTH_SHORT).show() }) {
+                    Icon(Icons.Filled.Tune, contentDescription = "Sort/Filter", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                IconButton(onClick = { Toast.makeText(context, "Grid / List layout", Toast.LENGTH_SHORT).show() }) {
+                    Icon(Icons.Filled.GridView, contentDescription = "Layout", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
+
+        // --- Tabs ---
+        TabRow(
+            selectedTabIndex = selectedTab,
+            containerColor = Color.Transparent,
+            divider = { HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)) },
+            modifier = Modifier.padding(horizontal = 12.dp)
+        ) {
+            tabs.forEachIndexed { index, title ->
+                Tab(
+                    selected = selectedTab == index,
+                    onClick = { selectedTab = index },
+                    text = {
+                        Text(
+                            text = title,
+                            fontWeight = if (selectedTab == index) FontWeight.Bold else FontWeight.Medium,
+                            fontSize = 14.sp
+                        )
+                    },
+                    selectedContentColor = MaterialTheme.colorScheme.primary,
+                    unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+
+        LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues)
-                .padding(horizontal = 20.dp)
+                .weight(1f),
+            contentPadding = PaddingValues(bottom = 100.dp, start = 24.dp, end = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Header Stats/Subtitle
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 12.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "${state.documents.size} Total Documents",
-                    fontSize = 13.sp,
-                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
-                    fontWeight = FontWeight.Medium
-                )
-            }
-
-            // Storage Permission Banner
-            if (!hasStoragePermission) {
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 16.dp),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)
-                    ),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.15f))
-                ) {
+            // --- Folders Grid Section ---
+            if (selectedTab == 0 || selectedTab == 1) {
+                item {
                     Row(
-                        modifier = Modifier.padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                "External Files Scanner",
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 13.sp,
-                                color = MaterialTheme.colorScheme.onSecondaryContainer
-                            )
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                "Grant storage access to scan and display latest documents in your Downloads and Documents folder.",
-                                fontSize = 10.sp,
-                                lineHeight = 14.sp,
-                                color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f)
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(16.dp))
-                        Button(
-                            onClick = {
-                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                                    storagePermLauncher.launch(Manifest.permission.READ_MEDIA_IMAGES)
-                                } else {
-                                    storagePermLauncher.launch(Manifest.permission.READ_EXTERNAL_STORAGE)
-                                }
-                            },
-                            shape = RoundedCornerShape(12.dp),
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
-                        ) {
-                            Text("Grant", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                        }
-                    }
-                }
-            }
-
-            // Document List or Empty State
-            if (state.documents.isEmpty()) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(22.dp))
-                            .background(MaterialTheme.colorScheme.surfaceVariant)
-                            .padding(32.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
+                            .padding(top = 16.dp, bottom = 8.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(64.dp)
-                                .clip(CircleShape)
-                                .background(MaterialTheme.colorScheme.outline.copy(alpha = 0.1f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Filled.FolderOff,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(30.dp)
-                            )
-                        }
-                        Spacer(modifier = Modifier.height(16.dp))
                         Text(
-                            text = "No documents yet",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSurface
+                            text = "Folders",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onBackground
                         )
-                        Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "Import a file or scan a document to get started",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            textAlign = TextAlign.Center
+                            text = "View all",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.clickable {
+                                Toast.makeText(context, "All folders", Toast.LENGTH_SHORT).show()
+                            }
                         )
                     }
                 }
-            } else {
-                LazyColumn(
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f)
-                ) {
-                    items(state.documents) { doc ->
-                        EditableDocumentListItem(
-                            document = doc,
-                            onClick = { onDocumentClick(doc.id) },
-                            onDelete = { docToDelete = doc }
-                        )
+
+                item {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        foldersList.take(2).forEach { folder ->
+                            val isSelected = state.selectedFolder == folder.name
+                            FolderGridItem(
+                                item = folder,
+                                isSelected = isSelected,
+                                modifier = Modifier.weight(1f),
+                                onClick = { viewModel.selectFolder(folder.name) }
+                            )
+                        }
                     }
+                }
+                item {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        foldersList.drop(2).take(2).forEach { folder ->
+                            val isSelected = state.selectedFolder == folder.name
+                            FolderGridItem(
+                                item = folder,
+                                isSelected = isSelected,
+                                modifier = Modifier.weight(1f),
+                                onClick = { viewModel.selectFolder(folder.name) }
+                            )
+                        }
+                    }
+                }
+            }
+
+            // --- Tags Horizontal Scroll Section ---
+            if (selectedTab == 0) {
+                item {
+                    Text(
+                        text = "Tags",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onBackground,
+                        modifier = Modifier.padding(top = 12.dp, bottom = 8.dp)
+                    )
+                }
+
+                item {
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        contentPadding = PaddingValues(horizontal = 0.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        items(tagsList) { tag ->
+                            val isSelected = state.selectedTag == tag.name
+                            TagPillItem(
+                                tag = tag,
+                                isSelected = isSelected,
+                                onClick = { viewModel.selectTag(tag.name) }
+                            )
+                        }
+                        item {
+                            // "+ Add tag" Button
+                            Row(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(20.dp))
+                                    .border(
+                                        width = 1.dp,
+                                        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+                                        shape = RoundedCornerShape(20.dp)
+                                    )
+                                    .clickable { Toast.makeText(context, "Add new tag", Toast.LENGTH_SHORT).show() }
+                                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.Add,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(12.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = "Add tag",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // --- Files List Section ---
+            if (selectedTab == 0 || selectedTab == 2) {
+                item {
+                    Text(
+                        text = if (state.selectedFolder != null || state.selectedTag != null) "Filtered Files" else "Files",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onBackground,
+                        modifier = Modifier.padding(top = 12.dp, bottom = 8.dp)
+                    )
+                }
+
+                if (state.filteredDocuments.isEmpty()) {
                     item {
-                        Spacer(modifier = Modifier.height(20.dp))
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(32.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("No files in this filter.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                } else {
+                    items(state.filteredDocuments) { doc ->
+                        FileRowItem(
+                            doc = doc,
+                            onClick = { onDocumentClick(doc.id) },
+                            onStarToggle = { viewModel.togglePin(doc) }
+                        )
                     }
                 }
             }
         }
     }
+}
 
-    // Delete Confirmation Dialog
-    if (docToDelete != null) {
-        AlertDialog(
-            onDismissRequest = { docToDelete = null },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        docToDelete?.let { viewModel.deleteDocument(it.id) }
-                        docToDelete = null
-                    },
-                    colors = ButtonDefaults.textButtonColors(
-                        contentColor = MaterialTheme.colorScheme.error
-                    )
-                ) {
-                    Text("Delete", fontWeight = FontWeight.Bold)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { docToDelete = null }) {
-                    Text("Cancel")
-                }
-            },
-            title = { Text("Delete Document?") },
-            text = { Text("Are you sure you want to permanently delete \"${docToDelete?.title}\"? This action cannot be undone.") },
-            shape = RoundedCornerShape(24.dp),
-            containerColor = MaterialTheme.colorScheme.surface
+@Composable
+fun FolderGridItem(
+    item: FolderItem,
+    isSelected: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    val context = LocalContext.current
+    Row(
+        modifier = modifier
+            .clip(RoundedCornerShape(16.dp))
+            .background(if (isSelected) item.color.copy(alpha = 0.1f) else MaterialTheme.colorScheme.surface)
+            .border(
+                width = if (isSelected) 2.dp else 1.dp,
+                color = if (isSelected) item.color else MaterialTheme.colorScheme.outline.copy(alpha = 0.08f),
+                shape = RoundedCornerShape(16.dp)
+            )
+            .clickable(onClick = onClick)
+            .padding(14.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .background(item.color.copy(alpha = 0.12f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Folder,
+                contentDescription = null,
+                tint = item.color,
+                modifier = Modifier.size(22.dp)
+            )
+        }
+
+        Spacer(modifier = Modifier.width(12.dp))
+
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = item.name,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = "${item.count} items" + if (item.isShared) " · Shared" else "",
+                fontSize = 11.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+            )
+        }
+
+        if (item.isStarred) {
+            Icon(
+                imageVector = Icons.Filled.Star,
+                contentDescription = "Starred",
+                tint = Color(0xFFF59E0B),
+                modifier = Modifier
+                    .size(16.dp)
+                    .align(Alignment.Top)
+            )
+        } else {
+            IconButton(
+                onClick = {
+                    Toast.makeText(context, "${item.name} options", Toast.LENGTH_SHORT).show()
+                },
+                modifier = Modifier.size(20.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.MoreVert,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                    modifier = Modifier.size(16.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun TagPillItem(
+    tag: TagItem,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(20.dp))
+            .background(if (isSelected) tag.color.copy(alpha = 0.15f) else Color.Transparent)
+            .border(
+                width = 1.dp,
+                color = if (isSelected) tag.color else MaterialTheme.colorScheme.outline.copy(alpha = 0.2f),
+                shape = RoundedCornerShape(20.dp)
+            )
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(6.dp)
+                .clip(CircleShape)
+                .background(tag.color)
+        )
+        Spacer(modifier = Modifier.width(6.dp))
+        Text(
+            text = tag.name,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold,
+            color = if (isSelected) tag.color else MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
 }
 
 @Composable
-fun EditableDocumentListItem(
-    document: DocumentEntity,
+fun FileRowItem(
+    doc: DocumentEntity,
     onClick: () -> Unit,
-    onDelete: () -> Unit
+    onStarToggle: () -> Unit
 ) {
-    val formatter = remember { SimpleDateFormat("MMM dd, yyyy - hh:mm a", Locale.getDefault()) }
-    val dateStr = formatter.format(Date(document.lastModified))
-
-    val (icon, iconBg, iconTint) = when (document.type.uppercase()) {
-        "PDF"       -> Triple(Icons.Filled.PictureAsPdf,   com.ceo3.docs.ui.theme.AccentRose.copy(alpha = 0.12f),    com.ceo3.docs.ui.theme.AccentRose)
-        "DOCX","DOC"-> Triple(Icons.Filled.Description,    com.ceo3.docs.ui.theme.AccentSky.copy(alpha = 0.12f),     com.ceo3.docs.ui.theme.AccentSky)
-        else        -> Triple(Icons.Filled.TextSnippet,     com.ceo3.docs.ui.theme.AccentAmber.copy(alpha = 0.12f),   com.ceo3.docs.ui.theme.AccentAmber)
+    val (icon, iconBg, iconTint) = when (doc.type.uppercase()) {
+        "PDF"        -> Triple(Icons.Filled.PictureAsPdf, AccentRose.copy(alpha = 0.12f), AccentRose)
+        "DOCX","DOC" -> Triple(Icons.Filled.Description, AccentSky.copy(alpha = 0.12f), AccentSky)
+        "XLSX","XLS" -> Triple(Icons.Filled.GridOn, AccentEmerald.copy(alpha = 0.12f), AccentEmerald)
+        else         -> Triple(Icons.Filled.TextSnippet, AccentAmber.copy(alpha = 0.12f), AccentAmber)
     }
 
-    var showMenu by remember { mutableStateOf(false) }
+    val timeLabel = when (doc.id) {
+        "project_proposal" -> "Just now"
+        "q2_financial_report" -> "2h ago"
+        "budget_overview" -> "Yesterday"
+        "meeting_notes" -> "2d ago"
+        else -> "Just now"
+    }
 
-    val interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
-    val isPressed by interactionSource.collectIsPressedAsState()
-    val scale by animateFloatAsState(
-        targetValue = if (isPressed) 0.97f else 1f,
-        animationSpec = tween(80),
-        label = "editableDocScale"
-    )
+    val sizeLabel = when (doc.id) {
+        "project_proposal" -> "1.2 MB"
+        "q2_financial_report" -> "2.4 MB"
+        "budget_overview" -> "850 KB"
+        "meeting_notes" -> "320 KB"
+        else -> "24 KB"
+    }
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .scale(scale)
-            .clip(RoundedCornerShape(18.dp))
+            .clip(RoundedCornerShape(16.dp))
             .background(MaterialTheme.colorScheme.surface)
             .border(
                 width = 1.dp,
-                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f),
-                shape = RoundedCornerShape(18.dp)
+                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.08f),
+                shape = RoundedCornerShape(16.dp)
             )
-            .clickable(
-                interactionSource = interactionSource,
-                indication = null,
-                onClick = onClick
-            )
+            .clickable(onClick = onClick)
             .padding(14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // File type icon with colored background
         Box(
             modifier = Modifier
                 .size(44.dp)
-                .clip(RoundedCornerShape(13.dp))
+                .clip(RoundedCornerShape(12.dp))
                 .background(iconBg),
             contentAlignment = Alignment.Center
         ) {
@@ -432,93 +538,39 @@ fun EditableDocumentListItem(
 
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = document.title,
-                style = MaterialTheme.typography.titleSmall,
+                text = "${doc.title}.${doc.type.lowercase()}",
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
-            Spacer(modifier = Modifier.height(3.dp))
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                // Type badge
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(5.dp))
-                        .background(iconBg)
-                        .padding(horizontal = 6.dp, vertical = 2.dp)
-                ) {
-                    Text(
-                        text = document.type.uppercase(),
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = iconTint
-                    )
-                }
-                if (document.tags.contains("External")) {
-                    val folder = document.tags.substringAfter("External,").uppercase()
-                    Text(
-                        text = "·",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
-                    )
-                    Text(
-                        text = folder,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1
-                    )
-                }
-                Text(
-                    text = "·",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
-                )
-                Text(
-                    text = dateStr,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = "$timeLabel · $sizeLabel",
+                fontSize = 11.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+            )
         }
 
-        Box {
-            IconButton(onClick = { showMenu = true }) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            IconButton(onClick = onStarToggle, modifier = Modifier.size(32.dp)) {
+                Icon(
+                    imageVector = if (doc.isPinned) Icons.Filled.Star else Icons.Outlined.StarBorder,
+                    contentDescription = "Pin/Star",
+                    tint = if (doc.isPinned) Color(0xFFF59E0B) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+            IconButton(onClick = { /* File options menu */ }, modifier = Modifier.size(32.dp)) {
                 Icon(
                     imageVector = Icons.Filled.MoreVert,
                     contentDescription = "Options",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                )
-            }
-            DropdownMenu(
-                expanded = showMenu,
-                onDismissRequest = { showMenu = false },
-                modifier = Modifier.background(MaterialTheme.colorScheme.surface)
-            ) {
-                DropdownMenuItem(
-                    text = { Text("Open File", style = MaterialTheme.typography.bodyMedium) },
-                    onClick = {
-                        showMenu = false
-                        onClick()
-                    },
-                    leadingIcon = { Icon(Icons.Filled.FileOpen, contentDescription = null, modifier = Modifier.size(18.dp)) }
-                )
-                DropdownMenuItem(
-                    text = { Text("Delete permanently", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error) },
-                    onClick = {
-                        showMenu = false
-                        onDelete()
-                    },
-                    leadingIcon = {
-                        Icon(
-                            Icons.Filled.Delete,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.error,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                    modifier = Modifier.size(20.dp)
                 )
             }
         }
