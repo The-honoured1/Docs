@@ -53,6 +53,9 @@ import com.ceo3.docs.ui.screens.ThemeSettingsScreen
 import com.ceo3.docs.ui.screens.SecurityPasscodeScreen
 import com.ceo3.docs.ui.screens.HelpSupportScreen
 import com.ceo3.docs.ui.screens.AboutDocsScreen
+import com.ceo3.docs.ui.screens.FAQScreen
+import com.ceo3.docs.ui.screens.PrivacyPolicyScreen
+import com.ceo3.docs.ui.screens.TermsOfServiceScreen
 import java.net.URLDecoder
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
@@ -78,6 +81,9 @@ sealed class Screen(val route: String) {
     object SecurityPasscode: Screen("settings/security")
     object HelpSupport     : Screen("settings/help")
     object AboutDocs       : Screen("settings/about")
+    object FAQ             : Screen("settings/help/faq")
+    object PrivacyPolicy   : Screen("settings/about/privacy")
+    object TermsOfService  : Screen("settings/about/terms")
 }
 
 private data class NavItem(
@@ -353,10 +359,26 @@ fun DocsNavHost(navController: NavHostController, settingsManager: SettingsManag
             )
         }
         composable(Screen.HelpSupport.route) {
-            HelpSupportScreen(onNavigateBack = { navController.popBackStack() })
+            HelpSupportScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToFAQ = { navController.navigate(Screen.FAQ.route) }
+            )
         }
         composable(Screen.AboutDocs.route) {
-            AboutDocsScreen(onNavigateBack = { navController.popBackStack() })
+            AboutDocsScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToPrivacyPolicy = { navController.navigate(Screen.PrivacyPolicy.route) },
+                onNavigateToTermsOfService = { navController.navigate(Screen.TermsOfService.route) }
+            )
+        }
+        composable(Screen.FAQ.route) {
+            FAQScreen(onNavigateBack = { navController.popBackStack() })
+        }
+        composable(Screen.PrivacyPolicy.route) {
+            PrivacyPolicyScreen(onNavigateBack = { navController.popBackStack() })
+        }
+        composable(Screen.TermsOfService.route) {
+            TermsOfServiceScreen(onNavigateBack = { navController.popBackStack() })
         }
     }
 }

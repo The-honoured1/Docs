@@ -20,7 +20,11 @@ import androidx.compose.ui.unit.sp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AboutDocsScreen(onNavigateBack: () -> Unit) {
+fun AboutDocsScreen(
+    onNavigateBack: () -> Unit,
+    onNavigateToPrivacyPolicy: () -> Unit,
+    onNavigateToTermsOfService: () -> Unit
+) {
     Scaffold(
         topBar = {
             TopAppBar(
@@ -72,9 +76,9 @@ fun AboutDocsScreen(onNavigateBack: () -> Unit) {
             
             Column(modifier = Modifier.fillMaxWidth()) {
                 HorizontalDivider()
-                AboutItem("Privacy Policy")
+                AboutItem("Privacy Policy", onClick = onNavigateToPrivacyPolicy)
                 HorizontalDivider()
-                AboutItem("Terms of Service")
+                AboutItem("Terms of Service", onClick = onNavigateToTermsOfService)
                 HorizontalDivider()
                 AboutItem("Open Source Licenses")
                 HorizontalDivider()

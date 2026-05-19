@@ -14,7 +14,10 @@ import androidx.compose.ui.unit.dp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HelpSupportScreen(onNavigateBack: () -> Unit) {
+fun HelpSupportScreen(
+    onNavigateBack: () -> Unit,
+    onNavigateToFAQ: () -> Unit
+) {
     Scaffold(
         topBar = {
             TopAppBar(
@@ -32,7 +35,7 @@ fun HelpSupportScreen(onNavigateBack: () -> Unit) {
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            SupportItem("Frequently Asked Questions (FAQ)")
+            SupportItem("Frequently Asked Questions (FAQ)", onClick = onNavigateToFAQ)
             HorizontalDivider()
             SupportItem("Contact Us")
             HorizontalDivider()
