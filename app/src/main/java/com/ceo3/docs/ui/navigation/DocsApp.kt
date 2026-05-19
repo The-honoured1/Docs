@@ -19,7 +19,11 @@ import androidx.compose.material.icons.outlined.People
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -34,6 +38,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.ceo3.docs.data.settings.SettingsManager
 import com.ceo3.docs.ui.screens.DonateScreen
 import com.ceo3.docs.ui.screens.EditorScreen
 import com.ceo3.docs.ui.screens.FilesScreen
@@ -91,8 +96,28 @@ private val navItems = listOf(
 )
 
 @Composable
-fun DocsApp() {
+fun DocsApp(settingsManager: SettingsManager? = null) {
     val navController = rememberNavController()
+
+    // Passcode logic
+    var isUnlocked by remember { mutableStateOf(false) }
+    val requirePasscode = settingsManager?.requirePasscodeFlow?.collectAsState(initial = false)?.value ?: false
+    
+    if (requirePasscode && !isUnlocked) {
+        // Simple Lock Screen
+        Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background), contentAlignment = Alignment.Center) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Icon(Icons.Filled.Settings, contentDescription = "Lock", modifier = Modifier.size(64.dp), tint = MaterialTheme.colorScheme.primary)
+                Spacer(modifier = Modifier.height(16.dp))
+                Text("App is locked", fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.height(32.dp))
+                Button(onClick = { isUnlocked = true }) {
+                    Text("Unlock (Mock)")
+                }
+            }
+        }
+        return
+    }
 
     Box(
         modifier = Modifier
@@ -106,6 +131,7 @@ fun DocsApp() {
 
         DocsNavHost(
             navController = navController,
+            settingsManager = settingsManager,
             modifier = Modifier.fillMaxSize()
         )
 
@@ -194,7 +220,7 @@ fun DocsApp() {
 }
 
 @Composable
-fun DocsNavHost(navController: NavHostController, modifier: Modifier = Modifier) {
+fun DocsNavHost(navController: NavHostController, settingsManager: SettingsManager? = null, modifier: Modifier = Modifier) {
     NavHost(
         navController = navController,
         startDestination = Screen.Home.route,
@@ -268,16 +294,28 @@ fun DocsNavHost(navController: NavHostController, modifier: Modifier = Modifier)
             )
         }
         composable(Screen.AccountSettings.route) {
-            AccountSettingsScreen(onNavigateBack = { navController.popBackStack() })
+            AccountSettingsScreen(
+                onNavigateBack = { navController.popBackStack() },
+                settingsManager = settingsManager
+            )
         }
         composable(Screen.CloudSyncBackup.route) {
-            CloudSyncBackupScreen(onNavigateBack = { navController.popBackStack() })
+            CloudSyncBackupScreen(
+                onNavigateBack = { navController.popBackStack() },
+                settingsManager = settingsManager
+            )
         }
         composable(Screen.ThemeSettings.route) {
-            ThemeSettingsScreen(onNavigateBack = { navController.popBackStack() })
+            ThemeSettingsScreen(
+                onNavigateBack = { navController.popBackStack() },
+                settingsManager = settingsManager
+            )
         }
         composable(Screen.SecurityPasscode.route) {
-            SecurityPasscodeScreen(onNavigateBack = { navController.popBackStack() })
+            SecurityPasscodeScreen(
+                onNavigateBack = { navController.popBackStack() },
+                settingsManager = settingsManager
+            )
         }
         composable(Screen.HelpSupport.route) {
             HelpSupportScreen(onNavigateBack = { navController.popBackStack() })
