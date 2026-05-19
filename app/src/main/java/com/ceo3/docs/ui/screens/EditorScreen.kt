@@ -347,67 +347,125 @@ fun RichTextEditorView(
     val context = LocalContext.current
     val scrollState = rememberScrollState()
     var editorTab by remember { mutableStateOf(0) } // 0 = Visual View, 1 = Raw Editor
+    var showWatermarkPromptDialog by remember { mutableStateOf(false) }
+    var isFullScreen by remember { mutableStateOf(false) }
+    var isAutoScrolling by remember { mutableStateOf(false) }
+    var isPageView by remember { mutableStateOf(false) }
+    var autoScrollSpeed by remember { mutableStateOf(15f) }
+
+    LaunchedEffect(isAutoScrolling) {
+        if (isAutoScrolling && !isPageView) {
+            while (isAutoScrolling) {
+                kotlinx.coroutines.delay(80)
+                val current = scrollState.value
+                val max = scrollState.maxValue
+                if (current < max) {
+                    scrollState.animateScrollTo(
+                        value = (current + 4).coerceAtMost(max),
+                        animationSpec = androidx.compose.animation.core.tween(
+                            durationMillis = 80, 
+                            easing = androidx.compose.animation.core.LinearEasing
+                        )
+                    )
+                } else {
+                    isAutoScrolling = false
+                }
+            }
+        }
+    }
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = viewModel.title,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                },
-                actions = {
-                    // Synced status indicator "All changes saved"
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(end = 12.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(6.dp)
-                                .clip(CircleShape)
-                                .background(Color(0xFF34A853))
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
+            if (!isFullScreen) {
+                TopAppBar(
+                    title = {
                         Text(
-                            text = "All changes saved",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = Color(0xFF5F6368)
+                            text = viewModel.title,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold
                         )
-                    }
-
-                    IconButton(onClick = { viewModel.undo() }) {
-                        Icon(Icons.Filled.Undo, contentDescription = "Undo")
-                    }
-                    IconButton(onClick = { viewModel.redo() }) {
-                        Icon(Icons.Filled.Redo, contentDescription = "Redo")
-                    }
-                    IconButton(onClick = { Toast.makeText(context, "Comment Mode", Toast.LENGTH_SHORT).show() }) {
-                        Icon(Icons.Filled.Comment, contentDescription = "Comment")
-                    }
-                    IconButton(onClick = {
-                        viewModel.saveDocument(documentId) {
-                            Toast.makeText(context, "Saved successfully", Toast.LENGTH_SHORT).show()
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = onNavigateBack) {
+                            Icon(Icons.Filled.ArrowBack, contentDescription = "Back")
                         }
-                    }) {
-                        Icon(Icons.Filled.Save, contentDescription = "Save")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
-            )
+                    },
+                    actions = {
+                        // Synced status indicator "All changes saved"
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(end = 8.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(6.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0xFF34A853))
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "Saved",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = Color(0xFF5F6368)
+                            )
+                        }
+
+                        // Page View Toggle
+                        IconButton(
+                            onClick = { isPageView = !isPageView },
+                            colors = IconButtonDefaults.iconButtonColors(
+                                containerColor = if (isPageView) MaterialTheme.colorScheme.primary.copy(alpha = 0.1f) else Color.Transparent
+                            )
+                        ) {
+                            Icon(
+                                imageVector = if (isPageView) Icons.Filled.MenuBook else Icons.Filled.Description,
+                                contentDescription = "Page View Mode",
+                                tint = if (isPageView) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+
+                        // Auto Scroll Toggle
+                        IconButton(
+                            onClick = { isAutoScrolling = !isAutoScrolling },
+                            colors = IconButtonDefaults.iconButtonColors(
+                                containerColor = if (isAutoScrolling) MaterialTheme.colorScheme.primary.copy(alpha = 0.1f) else Color.Transparent
+                            )
+                        ) {
+                            Icon(
+                                imageVector = if (isAutoScrolling) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                                contentDescription = "Auto Scroll",
+                                tint = if (isAutoScrolling) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+
+                        // Full Screen Mode Toggle
+                        IconButton(onClick = { isFullScreen = true }) {
+                            Icon(Icons.Filled.Fullscreen, contentDescription = "Full Screen")
+                        }
+
+                        IconButton(onClick = { viewModel.undo() }) {
+                            Icon(Icons.Filled.Undo, contentDescription = "Undo")
+                        }
+                        IconButton(onClick = { viewModel.redo() }) {
+                            Icon(Icons.Filled.Redo, contentDescription = "Redo")
+                        }
+                        IconButton(onClick = {
+                            viewModel.saveDocument(documentId) {
+                                Toast.makeText(context, "Saved successfully", Toast.LENGTH_SHORT).show()
+                            }
+                        }) {
+                            Icon(Icons.Filled.Save, contentDescription = "Save")
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
+                )
+            }
         },
         bottomBar = {
-            if (editorTab == 1) {
+            if (editorTab == 1 && !isFullScreen) {
                 // Screen 3 Bottom formatting toolbar (only visible in Raw Editor tab)
                 Column(
                     modifier = Modifier
@@ -519,6 +577,18 @@ fun RichTextEditorView(
                         IconButton(onClick = { Toast.makeText(context, "Quote Block", Toast.LENGTH_SHORT).show() }) {
                             Icon(Icons.Filled.FormatQuote, contentDescription = "Quote")
                         }
+                        IconButton(
+                            onClick = { showWatermarkPromptDialog = true },
+                            colors = IconButtonDefaults.iconButtonColors(
+                                containerColor = if (viewModel.watermarkText.isNotEmpty()) MaterialTheme.colorScheme.primary.copy(alpha = 0.1f) else Color.Transparent
+                            )
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.BrandingWatermark, 
+                                contentDescription = "Watermark", 
+                                tint = if (viewModel.watermarkText.isNotEmpty()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                            )
+                        }
                     }
                 }
             }
@@ -527,261 +597,302 @@ fun RichTextEditorView(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues)
+                .padding(if (isFullScreen) PaddingValues(0.dp) else paddingValues)
                 .background(Color(0xFFF3F4F6)) // light grey desk workspace
-                .padding(16.dp),
+                .padding(if (isFullScreen) 8.dp else 16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             // Segmented tab toggle
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(Color.White)
-                    .border(1.dp, Color.LightGray.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
-                    .padding(4.dp),
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                listOf("Visual View", "Raw Editor").forEachIndexed { idx, tabTitle ->
-                    val active = editorTab == idx
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(if (active) MaterialTheme.colorScheme.primary else Color.Transparent)
-                            .clickable { editorTab = idx }
-                            .padding(vertical = 8.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = tabTitle,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 13.sp,
-                            color = if (active) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+            if (!isFullScreen) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(Color.White)
+                        .border(1.dp, Color.LightGray.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
+                        .padding(4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    listOf("Visual View", "Raw Editor").forEachIndexed { idx, tabTitle ->
+                        val active = editorTab == idx
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(if (active) MaterialTheme.colorScheme.primary else Color.Transparent)
+                                .clickable { editorTab = idx }
+                                .padding(vertical = 8.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = tabTitle,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp,
+                                color = if (active) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
                 }
             }
 
-            // Paper document card
-            Column(
+            Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .weight(1f)
-                    .clip(RoundedCornerShape(8.dp))
-                    .shadow(4.dp, RoundedCornerShape(8.dp))
-                    .background(Color.White)
-                    .verticalScroll(scrollState)
-                    .padding(24.dp)
             ) {
-                val cleanTitle = viewModel.title.substringBeforeLast(".")
-                
-                // Large Bold Title
-                Text(
-                    text = cleanTitle,
-                    fontSize = if (viewModel.headerMode == "H1") 32.sp else 26.sp,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = FontFamily.SansSerif,
-                    color = Color(0xFF1E293B),
-                    modifier = Modifier.fillMaxWidth(),
-                    textAlign = when (viewModel.alignment) {
-                        "center" -> TextAlign.Center
-                        "right" -> TextAlign.Right
-                        else -> TextAlign.Left
+                if (editorTab == 0 && isPageView) {
+                    // --- PAGE-BY-PAGE SWIPEABLE VIEW MODE ---
+                    val allBlocks = parseVisualBlocks(viewModel.textContent)
+                    // Divide blocks into 3 swipeable pages dynamically
+                    val pageCount = 3
+                    val pagerState = androidx.compose.foundation.pager.rememberPagerState(pageCount = { pageCount })
+                    
+                    androidx.compose.foundation.pager.HorizontalPager(
+                        state = pagerState,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(RoundedCornerShape(8.dp))
+                            .shadow(4.dp, RoundedCornerShape(8.dp))
+                            .background(Color.White)
+                            .padding(24.dp)
+                    ) { pageIndex ->
+                        Column(
+                            modifier = Modifier.fillMaxSize()
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "PAGE ${pageIndex + 1} OF $pageCount",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f),
+                                    letterSpacing = 1.sp
+                                )
+                                Text(
+                                    text = viewModel.title.substringBeforeLast("."),
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = Color.LightGray
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(16.dp))
+                            
+                            val blocksPerPage = (allBlocks.size + pageCount - 1) / pageCount
+                            val pageBlocks = allBlocks.drop(pageIndex * blocksPerPage).take(blocksPerPage)
+                            
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .verticalScroll(rememberScrollState()),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                if (pageIndex == 0) {
+                                    val cleanTitle = viewModel.title.substringBeforeLast(".")
+                                    Text(
+                                        text = cleanTitle,
+                                        fontSize = if (viewModel.headerMode == "H1") 32.sp else 26.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        fontFamily = FontFamily.SansSerif,
+                                        color = Color(0xFF1E293B),
+                                        modifier = Modifier.fillMaxWidth(),
+                                        textAlign = when (viewModel.alignment) {
+                                            "center" -> TextAlign.Center
+                                            "right" -> TextAlign.Right
+                                            else -> TextAlign.Left
+                                        }
+                                    )
+                                    Spacer(modifier = Modifier.height(16.dp))
+                                }
+                                
+                                pageBlocks.forEach { block ->
+                                    RenderVisualBlock(block = block, viewModel = viewModel, context = context)
+                                }
+                            }
+                        }
                     }
-                )
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                if (editorTab == 1) {
-                    // --- RAW MARKDOWN EDITOR MODE ---
-                    BasicTextField(
-                        value = viewModel.textContent,
-                        onValueChange = { viewModel.updateText(it) },
-                        textStyle = TextStyle(
-                            fontSize = if (viewModel.headerMode == "H2") 18.sp else 14.sp,
-                            fontWeight = if (viewModel.isBold) FontWeight.Bold else FontWeight.Normal,
-                            fontStyle = if (viewModel.isItalic) FontStyle.Italic else FontStyle.Normal,
-                            color = Color(0xFF334155),
-                            lineHeight = 22.sp,
+                } else {
+                    // --- STANDARD SCROLLING CARD MODE (RAW OR VISUAL) ---
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(RoundedCornerShape(8.dp))
+                            .shadow(4.dp, RoundedCornerShape(8.dp))
+                            .background(Color.White)
+                            .verticalScroll(scrollState)
+                            .padding(24.dp)
+                    ) {
+                        val cleanTitle = viewModel.title.substringBeforeLast(".")
+                        
+                        // Large Bold Title
+                        Text(
+                            text = cleanTitle,
+                            fontSize = if (viewModel.headerMode == "H1") 32.sp else 26.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.SansSerif,
+                            color = Color(0xFF1E293B),
+                            modifier = Modifier.fillMaxWidth(),
                             textAlign = when (viewModel.alignment) {
                                 "center" -> TextAlign.Center
                                 "right" -> TextAlign.Right
                                 else -> TextAlign.Left
                             }
-                        ),
-                        modifier = Modifier.fillMaxWidth(),
-                        keyboardOptions = KeyboardOptions.Default
-                    )
-                } else {
-                    // --- BEAUTIFUL VISUAL RENDER MODE ---
-                    val blocks = parseVisualBlocks(viewModel.textContent)
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        blocks.forEach { block ->
-                            when (block) {
-                                is VisualBlock.Header -> {
-                                    val (size, color, weight) = when (block.level) {
-                                        1 -> Triple(22.sp, AccentSky, FontWeight.Bold)
-                                        2 -> Triple(18.sp, AccentSky, FontWeight.Bold)
-                                        else -> Triple(15.sp, Color(0xFF1E293B), FontWeight.Bold)
+                        )
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        if (editorTab == 1) {
+                            // --- RAW MARKDOWN EDITOR MODE ---
+                            BasicTextField(
+                                value = viewModel.textContent,
+                                onValueChange = { viewModel.updateText(it) },
+                                textStyle = TextStyle(
+                                    fontSize = if (viewModel.headerMode == "H2") 18.sp else 14.sp,
+                                    fontWeight = if (viewModel.isBold) FontWeight.Bold else FontWeight.Normal,
+                                    fontStyle = if (viewModel.isItalic) FontStyle.Italic else FontStyle.Normal,
+                                    color = Color(0xFF334155),
+                                    lineHeight = 22.sp,
+                                    textAlign = when (viewModel.alignment) {
+                                        "center" -> TextAlign.Center
+                                        "right" -> TextAlign.Right
+                                        else -> TextAlign.Left
                                     }
-                                    Column {
-                                        Spacer(modifier = Modifier.height(8.dp))
-                                        Text(
-                                            text = parseMarkdownText(block.text),
-                                            fontSize = size,
-                                            color = color,
-                                            fontWeight = weight
-                                        )
-                                        if (block.level == 1) {
-                                            Spacer(modifier = Modifier.height(4.dp))
-                                            HorizontalDivider(color = AccentSky.copy(alpha = 0.3f), thickness = 1.2.dp)
-                                        }
-                                        Spacer(modifier = Modifier.height(4.dp))
-                                    }
-                                }
-                                is VisualBlock.ChecklistItem -> {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .clickable { toggleChecklistItem(block.lineIndex, block.checked, viewModel) }
-                                            .padding(vertical = 4.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = if (block.checked) Icons.Filled.CheckBox else Icons.Filled.CheckBoxOutlineBlank,
-                                            contentDescription = null,
-                                            tint = if (block.checked) AccentSky else Color.Gray,
-                                            modifier = Modifier.size(20.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Text(
-                                            text = parseMarkdownText(block.text),
-                                            fontSize = 14.sp,
-                                            textDecoration = if (block.checked) TextDecoration.LineThrough else TextDecoration.None,
-                                            color = if (block.checked) Color.Gray else Color(0xFF334155)
-                                        )
-                                    }
-                                }
-                                is VisualBlock.BulletItem -> {
-                                    Row(
-                                        verticalAlignment = Alignment.Top,
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(vertical = 2.dp)
-                                    ) {
-                                        Text(
-                                            text = "•  ",
-                                            fontSize = 14.sp,
-                                            color = AccentSky,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                        Text(
-                                            text = parseMarkdownText(block.text),
-                                            fontSize = 14.sp,
-                                            color = Color(0xFF334155),
-                                            lineHeight = 20.sp
-                                        )
-                                    }
-                                }
-                                is VisualBlock.Blockquote -> {
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(vertical = 6.dp)
-                                            .clip(RoundedCornerShape(4.dp))
-                                            .background(Color(0xFFF1F5F9))
-                                            .padding(12.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Box(
-                                            modifier = Modifier
-                                                .width(4.dp)
-                                                .height(24.dp)
-                                                .background(AccentSky, RoundedCornerShape(2.dp))
-                                        )
-                                        Spacer(modifier = Modifier.width(12.dp))
-                                        Text(
-                                            text = parseMarkdownText(block.text, isItalic = true),
-                                            fontSize = 13.sp,
-                                            color = Color(0xFF475569)
-                                        )
-                                    }
-                                }
-                                is VisualBlock.Table -> {
-                                    Card(
-                                        shape = RoundedCornerShape(8.dp),
-                                        colors = CardDefaults.cardColors(containerColor = Color.White),
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(vertical = 8.dp)
-                                            .border(1.dp, Color.LightGray.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
-                                    ) {
-                                        Column(modifier = Modifier.fillMaxWidth()) {
-                                            // Headers
-                                            if (block.headers.isNotEmpty()) {
-                                                Row(
-                                                    modifier = Modifier
-                                                        .fillMaxWidth()
-                                                        .background(AccentSky.copy(alpha = 0.1f))
-                                                        .padding(10.dp)
-                                                ) {
-                                                    block.headers.forEach { header ->
-                                                        Text(
-                                                            text = header,
-                                                            fontWeight = FontWeight.Bold,
-                                                            fontSize = 12.sp,
-                                                            color = AccentSky,
-                                                            modifier = Modifier.weight(1f),
-                                                            textAlign = TextAlign.Left
-                                                        )
-                                                    }
-                                                }
-                                            }
-                                            // Rows
-                                            block.rows.forEachIndexed { rowIdx, rowCells ->
-                                                HorizontalDivider(color = Color.LightGray.copy(alpha = 0.3f))
-                                                Row(
-                                                    modifier = Modifier
-                                                        .fillMaxWidth()
-                                                        .background(if (rowIdx % 2 == 1) Color(0xFFF8FAFC) else Color.Transparent)
-                                                        .padding(10.dp)
-                                                ) {
-                                                    rowCells.forEach { cell ->
-                                                        Text(
-                                                            text = parseMarkdownText(cell),
-                                                            fontSize = 12.sp,
-                                                            color = Color(0xFF334155),
-                                                            modifier = Modifier.weight(1f),
-                                                            textAlign = TextAlign.Left
-                                                        )
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                                is VisualBlock.Paragraph -> {
-                                    if (block.text.trim().isNotEmpty()) {
-                                        Text(
-                                            text = parseMarkdownText(block.text),
-                                            fontSize = 14.sp,
-                                            color = Color(0xFF334155),
-                                            lineHeight = 22.sp,
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .padding(vertical = 2.dp)
-                                        )
-                                    }
+                                ),
+                                modifier = Modifier.fillMaxWidth(),
+                                keyboardOptions = KeyboardOptions.Default
+                            )
+                        } else {
+                            // --- BEAUTIFUL VISUAL RENDER MODE ---
+                            val blocks = parseVisualBlocks(viewModel.textContent)
+                            Column(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                blocks.forEach { block ->
+                                    RenderVisualBlock(block = block, viewModel = viewModel, context = context)
                                 }
                             }
                         }
                     }
                 }
+
+                // Watermark overlay
+                if (viewModel.watermarkText.isNotEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .matchParentSize()
+                            .padding(24.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = viewModel.watermarkText,
+                            fontSize = 58.sp,
+                            fontWeight = FontWeight.Black,
+                            color = Color.LightGray.copy(alpha = 0.12f),
+                            modifier = Modifier.rotate(-35f),
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+
+                // Exit Full Screen Floating Button
+                if (isFullScreen) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(16.dp),
+                        contentAlignment = Alignment.TopEnd
+                    ) {
+                        FloatingActionButton(
+                            onClick = { isFullScreen = false },
+                            containerColor = MaterialTheme.colorScheme.primaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.size(48.dp)
+                        ) {
+                            Icon(Icons.Filled.FullscreenExit, contentDescription = "Exit Full Screen")
+                        }
+                    }
+                }
             }
+        }
+        
+        if (showWatermarkPromptDialog) {
+            var tempWatermarkText by remember { mutableStateOf(viewModel.watermarkText) }
+            AlertDialog(
+                onDismissRequest = { showWatermarkPromptDialog = false },
+                title = { Text("Document Watermark", fontWeight = FontWeight.Bold) },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text("Enter watermark text to overlay diagonally across the document:", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        OutlinedTextField(
+                            value = tempWatermarkText,
+                            onValueChange = { tempWatermarkText = it },
+                            placeholder = { Text("e.g. CONFIDENTIAL") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text("Or select a template:", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            val templates = listOf("DRAFT", "CONFIDENTIAL", "URGENT", "COPY")
+                            templates.forEach { tmpl ->
+                                Card(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clickable { tempWatermarkText = tmpl },
+                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                                    shape = RoundedCornerShape(8.dp)
+                                ) {
+                                    Box(modifier = Modifier.padding(6.dp), contentAlignment = Alignment.Center) {
+                                        Text(tmpl, fontSize = 10.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            viewModel.watermarkText = tempWatermarkText
+                            showWatermarkPromptDialog = false
+                            if (tempWatermarkText.isNotEmpty()) {
+                                Toast.makeText(context, "Watermark '$tempWatermarkText' applied!", Toast.LENGTH_SHORT).show()
+                            } else {
+                                Toast.makeText(context, "Watermark removed.", Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text("Apply", fontWeight = FontWeight.Bold)
+                    }
+                },
+                dismissButton = {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        if (viewModel.watermarkText.isNotEmpty()) {
+                            TextButton(
+                                onClick = {
+                                    viewModel.watermarkText = ""
+                                    showWatermarkPromptDialog = false
+                                    Toast.makeText(context, "Watermark removed.", Toast.LENGTH_SHORT).show()
+                                }
+                            ) {
+                                Text("Remove", color = MaterialTheme.colorScheme.error)
+                            }
+                        }
+                        TextButton(onClick = { showWatermarkPromptDialog = false }) {
+                            Text("Cancel")
+                        }
+                    }
+                },
+                shape = RoundedCornerShape(24.dp)
+            )
         }
     }
 }
@@ -1083,6 +1194,171 @@ fun PptEditorView(
                         )
                     )
                 }
+            }
+        }
+    }
+}
+
+@Composable
+fun RenderVisualBlock(
+    block: VisualBlock,
+    viewModel: EditorViewModel,
+    context: android.content.Context
+) {
+    when (block) {
+        is VisualBlock.Header -> {
+            val (size, color, weight) = when (block.level) {
+                1 -> Triple(22.sp, AccentSky, FontWeight.Bold)
+                2 -> Triple(18.sp, AccentSky, FontWeight.Bold)
+                else -> Triple(15.sp, Color(0xFF1E293B), FontWeight.Bold)
+            }
+            Column {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = parseMarkdownText(block.text),
+                    fontSize = size,
+                    color = color,
+                    fontWeight = weight
+                )
+                if (block.level == 1) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    HorizontalDivider(color = AccentSky.copy(alpha = 0.3f), thickness = 1.2.dp)
+                }
+                Spacer(modifier = Modifier.height(4.dp))
+            }
+        }
+        is VisualBlock.ChecklistItem -> {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { toggleChecklistItem(block.lineIndex, block.checked, viewModel) }
+                    .padding(vertical = 4.dp)
+            ) {
+                Icon(
+                    imageVector = if (block.checked) Icons.Filled.CheckBox else Icons.Filled.CheckBoxOutlineBlank,
+                    contentDescription = null,
+                    tint = if (block.checked) AccentSky else Color.Gray,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = parseMarkdownText(block.text),
+                    fontSize = 14.sp,
+                    textDecoration = if (block.checked) TextDecoration.LineThrough else TextDecoration.None,
+                    color = if (block.checked) Color.Gray else Color(0xFF334155)
+                )
+            }
+        }
+        is VisualBlock.BulletItem -> {
+            Row(
+                verticalAlignment = Alignment.Top,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 2.dp)
+            ) {
+                Text(
+                    text = "•  ",
+                    fontSize = 14.sp,
+                    color = AccentSky,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = parseMarkdownText(block.text),
+                    fontSize = 14.sp,
+                    color = Color(0xFF334155),
+                    lineHeight = 20.sp
+                )
+            }
+        }
+        is VisualBlock.Blockquote -> {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 6.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(Color(0xFFF1F5F9))
+                    .padding(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .width(4.dp)
+                        .height(24.dp)
+                        .background(AccentSky, RoundedCornerShape(2.dp))
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(
+                    text = parseMarkdownText(block.text, isItalic = true),
+                    fontSize = 13.sp,
+                    color = Color(0xFF475569)
+                )
+            }
+        }
+        is VisualBlock.Table -> {
+            Card(
+                shape = RoundedCornerShape(8.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp)
+                    .border(1.dp, Color.LightGray.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+            ) {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    // Headers
+                    if (block.headers.isNotEmpty()) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(AccentSky.copy(alpha = 0.1f))
+                                .padding(10.dp)
+                        ) {
+                            block.headers.forEach { header ->
+                                Text(
+                                    text = header,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 12.sp,
+                                    color = AccentSky,
+                                    modifier = Modifier.weight(1f),
+                                    textAlign = TextAlign.Left
+                                )
+                            }
+                        }
+                    }
+                    // Rows
+                    block.rows.forEachIndexed { rowIdx, rowCells ->
+                        HorizontalDivider(color = Color.LightGray.copy(alpha = 0.3f))
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(if (rowIdx % 2 == 1) Color(0xFFF8FAFC) else Color.Transparent)
+                                .padding(10.dp)
+                        ) {
+                            rowCells.forEach { cell ->
+                                Text(
+                                    text = parseMarkdownText(cell),
+                                    fontSize = 12.sp,
+                                    color = Color(0xFF334155),
+                                    modifier = Modifier.weight(1f),
+                                    textAlign = TextAlign.Left
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        is VisualBlock.Paragraph -> {
+            if (block.text.trim().isNotEmpty()) {
+                Text(
+                    text = parseMarkdownText(block.text),
+                    fontSize = 14.sp,
+                    color = Color(0xFF334155),
+                    lineHeight = 22.sp,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 2.dp)
+                )
             }
         }
     }
