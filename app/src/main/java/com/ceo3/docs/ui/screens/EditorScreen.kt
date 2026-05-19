@@ -387,54 +387,34 @@ fun EditorScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text(
-                            text = state.title,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 16.sp,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        Text(
-                            text = if (state.viewMode == EditorViewMode.PDF_SIGN) "Edit & Sign Mode" else "Read-Only Mode",
-                            fontSize = 11.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                },
+            CenterAlignedTopAppBar(
+                title = { Text(state.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
                 actions = {
                     if (state.viewMode == EditorViewMode.PDF_VIEW && state.pages.isNotEmpty()) {
                         IconButton(onClick = { viewModel.setViewMode(EditorViewMode.PDF_SIGN) }) {
-                            Icon(Icons.Filled.Draw, contentDescription = "Sign/Draw Document", tint = MaterialTheme.colorScheme.primary)
+                            Icon(Icons.Filled.Edit, contentDescription = "Edit")
                         }
                     } else if (state.viewMode == EditorViewMode.PDF_SIGN) {
-                        IconButton(onClick = {
+                        TextButton(onClick = {
                             viewModel.saveSignedDocument {
-                                Toast.makeText(context, "Annotations saved successfully!", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, "Saved!", Toast.LENGTH_SHORT).show()
                                 viewModel.setViewMode(EditorViewMode.PDF_VIEW)
                             }
                         }) {
-                            if (state.isSaving) {
-                                CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.5.dp)
-                            } else {
-                                Icon(Icons.Filled.Save, contentDescription = "Save Changes", tint = MaterialTheme.colorScheme.tertiary)
-                            }
+                            if (state.isSaving) CircularProgressIndicator(Modifier.size(16.dp)) else Text("Save")
                         }
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
+                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
                     containerColor = MaterialTheme.colorScheme.background
                 )
             )
-        },
-        containerColor = MaterialTheme.colorScheme.background
+        }
     ) { paddingValues ->
         Box(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
             if (state.isLoading) {
@@ -505,54 +485,28 @@ fun EditorScreen(
                             // Sign/Draw Option bar overlay
                             AnimatedVisibility(
                                 visible = state.viewMode == EditorViewMode.PDF_SIGN,
-                                enter = slideInVertically { -it } + fadeIn(),
-                                exit = slideOutVertically { -it } + fadeOut()
+                                enter = expandVertically() + fadeIn(),
+                                exit = shrinkVertically() + fadeOut()
                             ) {
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .background(MaterialTheme.colorScheme.surface)
-                                        .border(BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.06f)))
-                                        .padding(horizontal = 20.dp, vertical = 12.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                        .padding(8.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    // Brush colors selection
-                                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                                        listOf(Color.Black, Color.Blue, Color.Red, Color(0xFF4CAF50)).forEach { color ->
-                                            Box(
-                                                modifier = Modifier
-                                                    .size(24.dp)
-                                                    .clip(CircleShape)
-                                                    .background(color)
-                                                    .border(
-                                                        BorderStroke(
-                                                            if (selectedDrawColor == color) 2.dp else 0.dp,
-                                                            MaterialTheme.colorScheme.primary
-                                                        ),
-                                                        CircleShape
-                                                    )
-                                                    .clickable { selectedDrawColor = color }
-                                            )
+                                    IconButton(onClick = { viewModel.setViewMode(EditorViewMode.PDF_VIEW) }) {
+                                        Icon(Icons.Filled.Close, "Cancel")
+                                    }
+                                    Spacer(Modifier.weight(1f))
+                                    listOf(Color.Black, Color.Blue, Color.Red).forEach { color ->
+                                        IconButton(onClick = { selectedDrawColor = color }) {
+                                            Icon(Icons.Filled.Circle, "Color", tint = color, modifier = Modifier.size(24.dp))
                                         }
                                     }
-
-                                    // Action to clear drawings on all pages or cancel edit mode
-                                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                        TextButton(onClick = { viewModel.setViewMode(EditorViewMode.PDF_VIEW) }) {
-                                            Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                        }
-                                        Button(
-                                            onClick = {
-                                                repeat(state.pages.size) { viewModel.clearDrawingPaths(it) }
-                                            },
-                                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                                            shape = RoundedCornerShape(12.dp)
-                                        ) {
-                                            Icon(Icons.Filled.DeleteSweep, contentDescription = null, modifier = Modifier.size(16.dp))
-                                            Spacer(modifier = Modifier.width(6.dp))
-                                            Text("Clear All", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                        }
+                                    IconButton(onClick = { 
+                                        state.pages.indices.forEach { viewModel.clearDrawingPaths(it) } 
+                                    }) {
+                                        Icon(Icons.Filled.Delete, "Clear")
                                     }
                                 }
                             }
