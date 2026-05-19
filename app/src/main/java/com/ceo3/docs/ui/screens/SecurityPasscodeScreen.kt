@@ -8,12 +8,19 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.ceo3.docs.data.settings.SettingsManager
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SecurityPasscodeScreen(onNavigateBack: () -> Unit) {
-    var requirePasscode by remember { mutableStateOf(false) }
-    var useBiometrics by remember { mutableStateOf(false) }
+fun SecurityPasscodeScreen(
+    onNavigateBack: () -> Unit,
+    settingsManager: SettingsManager? = null
+) {
+    val coroutineScope = rememberCoroutineScope()
+    
+    val requirePasscode by settingsManager?.requirePasscodeFlow?.collectAsState(initial = false) ?: remember { mutableStateOf(false) }
+    val useBiometrics by settingsManager?.useBiometricsFlow?.collectAsState(initial = false) ?: remember { mutableStateOf(false) }
     
     Scaffold(
         topBar = {
@@ -43,7 +50,12 @@ fun SecurityPasscodeScreen(onNavigateBack: () -> Unit) {
                     Text("Require Passcode", style = MaterialTheme.typography.titleMedium)
                     Text("Lock the app with a PIN", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                Switch(checked = requirePasscode, onCheckedChange = { requirePasscode = it })
+                Switch(
+                    checked = requirePasscode, 
+                    onCheckedChange = { 
+                        coroutineScope.launch { settingsManager?.setRequirePasscode(it) } 
+                    }
+                )
             }
             
             if (requirePasscode) {
@@ -63,7 +75,12 @@ fun SecurityPasscodeScreen(onNavigateBack: () -> Unit) {
                         Text("Use Biometrics", style = MaterialTheme.typography.titleMedium)
                         Text("Unlock with Face/Fingerprint", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                    Switch(checked = useBiometrics, onCheckedChange = { useBiometrics = it })
+                    Switch(
+                        checked = useBiometrics, 
+                        onCheckedChange = { 
+                            coroutineScope.launch { settingsManager?.setUseBiometrics(it) }
+                        }
+                    )
                 }
             }
         }

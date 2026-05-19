@@ -8,12 +8,19 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.ceo3.docs.data.settings.SettingsManager
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CloudSyncBackupScreen(onNavigateBack: () -> Unit) {
-    var autoSync by remember { mutableStateOf(true) }
-    var syncWifiOnly by remember { mutableStateOf(true) }
+fun CloudSyncBackupScreen(
+    onNavigateBack: () -> Unit,
+    settingsManager: SettingsManager? = null
+) {
+    val coroutineScope = rememberCoroutineScope()
+    
+    val autoSync by settingsManager?.autoSyncFlow?.collectAsState(initial = true) ?: remember { mutableStateOf(true) }
+    val syncWifiOnly by settingsManager?.syncWifiOnlyFlow?.collectAsState(initial = true) ?: remember { mutableStateOf(true) }
     
     Scaffold(
         topBar = {
@@ -43,7 +50,12 @@ fun CloudSyncBackupScreen(onNavigateBack: () -> Unit) {
                     Text("Auto-Sync", style = MaterialTheme.typography.titleMedium)
                     Text("Keep documents backed up automatically", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                Switch(checked = autoSync, onCheckedChange = { autoSync = it })
+                Switch(
+                    checked = autoSync, 
+                    onCheckedChange = { 
+                        coroutineScope.launch { settingsManager?.setAutoSync(it) } 
+                    }
+                )
             }
             
             Row(
@@ -57,7 +69,9 @@ fun CloudSyncBackupScreen(onNavigateBack: () -> Unit) {
                 }
                 Switch(
                     checked = syncWifiOnly, 
-                    onCheckedChange = { syncWifiOnly = it },
+                    onCheckedChange = { 
+                        coroutineScope.launch { settingsManager?.setSyncWifiOnly(it) } 
+                    },
                     enabled = autoSync
                 )
             }

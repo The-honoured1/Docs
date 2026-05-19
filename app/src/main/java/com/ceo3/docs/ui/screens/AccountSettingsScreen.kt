@@ -9,12 +9,22 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.ceo3.docs.data.settings.SettingsManager
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AccountSettingsScreen(onNavigateBack: () -> Unit) {
-    var name by remember { mutableStateOf("Alex Mercer") }
-    var email by remember { mutableStateOf("alex.mercer@docs.app") }
+fun AccountSettingsScreen(
+    onNavigateBack: () -> Unit,
+    settingsManager: SettingsManager? = null
+) {
+    val coroutineScope = rememberCoroutineScope()
+    
+    val initialName by settingsManager?.userNameFlow?.collectAsState(initial = "Alex Mercer") ?: remember { mutableStateOf("Alex Mercer") }
+    val initialEmail by settingsManager?.userEmailFlow?.collectAsState(initial = "alex.mercer@docs.app") ?: remember { mutableStateOf("alex.mercer@docs.app") }
+    
+    var name by remember(initialName) { mutableStateOf(initialName) }
+    var email by remember(initialEmail) { mutableStateOf(initialEmail) }
     
     Scaffold(
         topBar = {
@@ -37,14 +47,20 @@ fun AccountSettingsScreen(onNavigateBack: () -> Unit) {
         ) {
             OutlinedTextField(
                 value = name,
-                onValueChange = { name = it },
+                onValueChange = { 
+                    name = it 
+                    coroutineScope.launch { settingsManager?.setUserName(it) }
+                },
                 label = { Text("Full Name") },
                 modifier = Modifier.fillMaxWidth()
             )
             
             OutlinedTextField(
                 value = email,
-                onValueChange = { email = it },
+                onValueChange = { 
+                    email = it
+                    coroutineScope.launch { settingsManager?.setUserEmail(it) }
+                },
                 label = { Text("Email Address") },
                 modifier = Modifier.fillMaxWidth()
             )

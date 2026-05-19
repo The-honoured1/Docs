@@ -9,12 +9,19 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.ceo3.docs.data.settings.SettingsManager
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ThemeSettingsScreen(onNavigateBack: () -> Unit) {
+fun ThemeSettingsScreen(
+    onNavigateBack: () -> Unit,
+    settingsManager: SettingsManager? = null
+) {
+    val coroutineScope = rememberCoroutineScope()
     val themeOptions = listOf("System Default", "Light Mode", "Dark Mode")
-    var selectedTheme by remember { mutableStateOf(themeOptions[0]) }
+    
+    val currentTheme by settingsManager?.themeFlow?.collectAsState(initial = themeOptions[0]) ?: remember { mutableStateOf(themeOptions[0]) }
     
     Scaffold(
         topBar = {
@@ -44,13 +51,17 @@ fun ThemeSettingsScreen(onNavigateBack: () -> Unit) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable { selectedTheme = option }
+                        .clickable { 
+                            coroutineScope.launch { settingsManager?.setTheme(option) }
+                        }
                         .padding(horizontal = 8.dp, vertical = 12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     RadioButton(
-                        selected = (selectedTheme == option),
-                        onClick = { selectedTheme = option }
+                        selected = (currentTheme == option),
+                        onClick = { 
+                            coroutineScope.launch { settingsManager?.setTheme(option) }
+                        }
                     )
                     Spacer(modifier = Modifier.width(16.dp))
                     Text(text = option, style = MaterialTheme.typography.bodyLarge)
